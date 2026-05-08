@@ -2,6 +2,7 @@
 Thumbs.db
 *.log
 .idea/
+.claude
 .vscode/
 *.swp
 *~

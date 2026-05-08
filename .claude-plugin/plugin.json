@@ -1,7 +1,7 @@
 {
   "name": "mcp-trust",
-  "version": "0.1.0",
-  "description": "Audit MCP servers, AI agents, and agentic OAuth flows for the threats catalogued in the SANS/AWS 2025 agentic-AI security whitepaper.",
+  "version": "0.2.0",
+  "description": "Commercial-grade 42-substep security audit of MCP servers, AI agents, and agentic OAuth flows against the SANS/AWS 2025 agentic-AI threat taxonomy. Live audit map, per-substep severity rubric, weighted 0-10 trust score, top-3 risks, remediation roadmap, AWS compliance mapping.",
   "author": {
     "name": "Ali Javadi",
     "url": "https://github.com/alijavadi2450"
