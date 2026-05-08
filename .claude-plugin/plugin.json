@@ -1,0 +1,22 @@
+{
+  "name": "mcp-trust",
+  "version": "0.1.0",
+  "description": "Audit MCP servers, AI agents, and agentic OAuth flows for the threats catalogued in the SANS/AWS 2025 agentic-AI security whitepaper.",
+  "author": {
+    "name": "Ali Javadi",
+    "url": "https://github.com/alijavadi2450"
+  },
+  "homepage": "https://github.com/alijavadi2450/MCP-TRUST",
+  "repository": "https://github.com/alijavadi2450/MCP-TRUST",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "security",
+    "audit",
+    "agentic-ai",
+    "oauth",
+    "claude-code",
+    "skill"
+  ]
+}
