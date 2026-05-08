@@ -52,6 +52,32 @@ connected graph. The **detailed substep tracker** is rendered at the start
 and re-rendered after every substep so the user always knows where the
 audit is.
 
+### 2.0 Banner (render verbatim at audit start, before anything else)
+
+Print this banner exactly, then a single blank line, then proceed to the
+architectural flowchart (2.1). This is the first thing the user sees on
+every `/mcp-trust` invocation.
+
+```
+          ____             ,-.----.                 ,/   .`|                                         ,/   .`|
+        ,'  , `.  ,----..  \    /  \              ,`   .'  :,-.----.                  .--.--.      ,`   .'  :
+     ,-+-,.' _ | /   /   \ |   :    \           ;    ;     /\    /  \           ,--, /  /    '.  ;    ;     /
+  ,-+-. ;   , |||   :     :|   |  .\ :        .'___,/    ,' ;   :    \        ,'_ /||  :  /`. /.'___,/    ,'
+ ,--.'|'   |  ;|.   |  ;. /.   :  |: |        |    :     |  |   | .\ :   .--. |  | :;  |  |--` |    :     |
+|   |  ,', |  ':.   ; /--` |   |   \ :        ;    |.';  ;  .   : |: | ,'_ /| :  . ||  :  ;_   ;    |.';  ;
+|   | /  | |  ||;   | ;    |   : .   /        `----'  |  |  |   |  \ : |  ' | |  . . \  \    `.`----'  |  |
+'   | :  | :  |,|   : |    ;   | |`-'             '   :  ;  |   : .  / |  | ' |  | |  `----.   \   '   :  ;
+;   . |  ; |--' .   | '___ |   | ;                |   |  '  ;   | |  \ :  | | :  ' ;  __ \  \  |   |   |  '
+|   : |  | ,    '   ; : .'|:   ' |                '   :  |  |   | ;\  \|  ; ' |  | ' /  /`--'  /   '   :  |
+|   : '  |/     '   | '/  ::   : :                ;   |.'   :   ' | \.':  | : ;  ; |'--'.     /    ;   |.'
+;   | |`-'      |   :    / |   | :                '---'     :   : :-'  '  :  `--'   \ `--'---'     '---'
+|   ;/           \   \ .'  `---'.|                          |   |.'    :  ,      .-./
+'---'             `---`      `---`                          `---'       `--`----'
+
+                Agentic AI Security Audit  ·  SANS / AWS 2025
+                48 substeps  ·  5 pillars  ·  live CVE + sanctions feeds
+```
+
 ### 2.1 Architectural flowchart (render at start and end)
 
 ```
@@ -229,18 +255,176 @@ before moving on:
 The architectural flowchart (section 2.1) is rendered **only** at audit start
 and at audit end, with an "audit complete" annotation on the closing render.
 
+### 2.4  Dynamic phase locator (render at every phase transition)
+
+A vertical, single-column view of the seven phases with a `◀── YOU ARE HERE`
+marker that moves down the chart as the audit walks through each phase.
+This complements the macro architectural flowchart (2.1, rendered only at
+bookends) and the detailed substep tracker (2.2, re-rendered after every
+substep) by giving the user a phase-level "where am I, what just finished,
+what's next" view at every phase boundary.
+
+**When to render:**
+- Once at audit start, with `◀── starting here` on Phase 0.
+- Each time the audit enters a new phase (i.e. before substep 0.1, 1.1,
+  2.1, 3.1, 4.1, 5.1, 6.1) — re-render with `[x]` (or `[!]` / `[~]`) on
+  all completed phases and `◀── YOU ARE HERE` on the newly active phase.
+- Once at audit end, with `[*] ◀── audit complete` on Phase 6.
+
+**Marker semantics on phase lines:**
+
+| Phase line marker                      | Meaning                            |
+|----------------------------------------|------------------------------------|
+| `[ ] PHASE n · ...`                    | Pending — not yet entered          |
+| `[>] PHASE n · ... ◀── YOU ARE HERE`   | Currently in this phase            |
+| `[x] PHASE n · ...`                    | Completed — clean (no findings)    |
+| `[!] PHASE n · ...`                    | Completed — findings recorded      |
+| `[~] PHASE n · ...`                    | Skipped — not applicable to target |
+| `[*] PHASE n · ... ◀── audit complete` | Final close                        |
+
+**Template** (replace each `<MARKER>` per the table above):
+
+```
++======================================================================+
+|                  MCP-TRUST  ·  PHASE LOCATOR                         |
++======================================================================+
+
+   ┌─────────────────────────────────────────┐
+   │  PHASE 0  ·  DISCOVERY                  │  <MARKER>
+   │  classify · transport · auth · invent.  │
+   └────────────────────┬────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 1  ·  IDENTITY & AUTHENTICITY    │  <MARKER>
+   │  12 substeps · OAuth · JWT · ETDI       │
+   └────────────────────┬────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 2  ·  LEAST PRIVILEGE & DELEG.   │  <MARKER>
+   │  10 substeps · confused deputy · JIT    │
+   └────────────────────┬────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 3  ·  INPUT TRUST BOUNDARY       │  <MARKER>
+   │  10 substeps · prompt / data injection  │
+   └────────────────────┬────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 4  ·  OBSERVABILITY & RUNTIME    │  <MARKER>
+   │  10 substeps · logs · rate · anomaly    │
+   └────────────────────┬────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 5  ·  SUPPLY CHAIN & DEPENDENCY  │  <MARKER>
+   │  6 substeps · live CVE · jurisdiction   │
+   └────────────────────┬────────────────────┘
+                        │
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 6  ·  SCORE & REPORT             │  <MARKER>
+   │  trust score · top-3 · roadmap          │
+   └─────────────────────────────────────────┘
+```
+
+**Worked example** — the locator while the audit is mid-Phase-2:
+
+```
+   ┌─────────────────────────────────────────┐
+   │  PHASE 0  ·  DISCOVERY                  │  [x] done
+   └────────────────────┬────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 1  ·  IDENTITY & AUTHENTICITY    │  [!] 3 findings
+   └────────────────────┬────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 2  ·  LEAST PRIVILEGE & DELEG.   │  [>] ◀── YOU ARE HERE
+   └────────────────────┬────────────────────┘
+                        ▼
+   ┌─────────────────────────────────────────┐
+   │  PHASE 3  ·  INPUT TRUST BOUNDARY       │  [ ] pending
+   └────────────────────┬────────────────────┘
+                  (... remaining phases ...)
+```
+
+### 2.5  Per-substep preview (print before running each substep)
+
+Before running any substep's checks, print a single preview block so the
+user knows exactly what is about to be examined. After the substep's
+checks complete, print a result summary. This wraps every substep in a
+"about to look at X" → "X done, found Y" envelope.
+
+**Format (before substep runs):**
+
+```
+▶ Substep X.Y — <substep name>
+  Examines: <one-sentence preview derived from the substep's "Inspect:"
+            block — what code patterns, configurations, or external
+            sources are about to be checked>
+```
+
+**Format (after substep runs):**
+
+```
+>>> Substep X.Y complete — <count> findings
+    Severity:  C critical / H high / M medium / L low
+    Next:      X.Y+1 <next substep name>
+```
+
+**Examples:**
+
+```
+▶ Substep 1.3 — Redirect URI validation
+  Examines: how the OAuth client matches redirect_uri against its
+  allowlist — wildcard / prefix / regex / substring matching are
+  unsafe; only exact match is acceptable.
+
+[... checks run ...]
+
+>>> Substep 1.3 complete — 2 findings
+    Severity:  1 critical / 1 high
+    Next:      1.4 State parameter integrity
+```
+
+```
+▶ Substep 5.2 — Known-vulnerability cross-reference (live advisories)
+  Examines: each direct dependency against NVD, MITRE CVE, GitHub
+  Advisory DB, OSV.dev, CISA KEV, Exploit-DB, CERT/CC, Snyk, OpenCVE
+  and per-package security-advisory pages — fetched live via WebFetch.
+
+[... checks run ...]
+
+>>> Substep 5.2 complete — 1 finding
+    Severity:  0 critical / 1 high
+    Next:      5.3 Maintainer jurisdiction & sanctions screening
+```
+
 ---
 
 ## 3. Procedure
 
 For every substep:
 
-1. State the substep ID and name out loud.
-2. List the **threat anchor(s)** from the whitepaper or external source.
-3. Run the listed Grep / Read / WebFetch targets.
-4. For each match, classify against the **severity rubric** below.
-5. Emit findings in the standard finding-record format.
-6. Re-render the substep tracker with the substep marked.
+1. **If this substep is the first of its phase** (i.e. 0.1, 1.1, 2.1, 3.1,
+   4.1, 5.1, or 6.1), re-render the dynamic phase locator (Section 2.4)
+   with `◀── YOU ARE HERE` on the new active phase and the appropriate
+   completed-phase marker (`[x]` clean, `[!]` findings, `[~]` skipped) on
+   each prior phase.
+2. **Print the per-substep preview block** (Section 2.5) — substep ID,
+   name, and a one-sentence `Examines: ...` line derived from the
+   substep's `Inspect:` block.
+3. State the **threat anchor(s)** from the whitepaper or external source.
+4. Run the listed Grep / Read / WebFetch targets.
+5. For each match, classify against the **severity rubric** below.
+6. Emit findings in the standard finding-record format.
+7. **Print the post-substep result summary** (Section 2.5) — finding count
+   by severity and the name of the next substep.
+8. Re-render the substep tracker (Section 2.2) with the substep marked.
 
 ### Finding record format
 
