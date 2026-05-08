@@ -17,7 +17,7 @@
 
 # MCP-TRUST
 
-A commercial-grade Claude Code **skill** that runs a **48-substep security
+A commercial-grade Claude Code **skill** that runs a **55-substep security
 audit** of MCP (Model Context Protocol) servers, AI agents, and agentic OAuth
 flows against the threat taxonomy from the SANS / AWS 2025 whitepaper
 *"Navigating modern application security challenges with evolved reliance on
@@ -37,8 +37,9 @@ UN, and US BIS sanctions frameworks.
 - An **architectural flowchart** of the audit pipeline at start and end, plus
   a **live substep tracker** rendered after every substep — so you always
   know where the audit is, what cleared, and what is in progress.
-- **48 substeps across 5 pillars**, every one anchored to a named threat
-  from the whitepaper or to a concrete external advisory / sanctions source.
+- **55 substeps across 5 pillars** (12 / 12 / 12 / 10 / 9), every one
+  anchored to a named threat from the whitepaper or to a concrete
+  external advisory / sanctions source.
 - **Live CVE & advisory cross-reference** — fetches at audit time from NVD,
   MITRE CVE, GitHub Advisory DB, OSV.dev, CISA KEV, Exploit-DB, CERT/CC,
   Snyk, OpenCVE, CVEdetails, ecosystem-specific advisory DBs, HackerOne /

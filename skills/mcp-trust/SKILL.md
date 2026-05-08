@@ -1,12 +1,12 @@
 ---
 name: mcp-trust
-description: Commercial-grade security audit playbook for MCP (Model Context Protocol) servers, AI agents, and agentic OAuth flows. Walks 48 substeps across five pillars from the SANS/AWS 2025 whitepaper "Navigating modern application security challenges with evolved reliance on AI-based applications" plus a Supply Chain & Dependency layer — Identity & Authenticity, Least Privilege & Delegation, Input Trust Boundary, Observability & Runtime, and Supply Chain & Dependency Security. Auto-triggers on imports of `mcp`, `FastMCP`, `@modelcontextprotocol/sdk`; on `@mcp.tool` / `@mcp.resource` / `@mcp.prompt` handlers; on agentic OAuth artifacts (`redirect_uri`, `state=`, `code_verifier`, PKCE, `Mcp-Session-Id`); on multi-agent orchestration code (LangGraph, CrewAI, Strands, AutoGen); on Streamable HTTP / SSE transport implementations; and on the presence of dependency manifests (`package.json`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `go.mod`). Renders an architectural flowchart at start and end and a live substep tracker that ticks after every substep, then produces a severity-rated finding list, a 0–10 trust score, top-3 critical risks, a remediation roadmap, AWS-control compliance mapping, live CVE/advisory cross-reference, and jurisdictional supply-chain risk screening anchored to OFAC/EU/UN/BIS sanctions frameworks. Invoke explicitly with `/mcp-trust`.
+description: Commercial-grade security audit playbook for MCP (Model Context Protocol) servers, AI agents, and agentic OAuth flows. Walks 55 substeps across five pillars from the SANS/AWS 2026 whitepaper "Navigating modern application security challenges with evolved reliance on AI-based applications" plus a Supply Chain & Dependency layer — Identity & Authenticity, Least Privilege & Delegation, Input Trust Boundary, Observability & Runtime, and Supply Chain & Dependency Security. Auto-triggers on imports of `mcp`, `FastMCP`, `@modelcontextprotocol/sdk`; on `@mcp.tool` / `@mcp.resource` / `@mcp.prompt` handlers; on agentic OAuth artifacts (`redirect_uri`, `state=`, `code_verifier`, PKCE, `Mcp-Session-Id`); on multi-agent orchestration code (LangGraph, CrewAI, Strands, AutoGen); on Streamable HTTP / SSE transport implementations; and on the presence of dependency manifests (`package.json`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `go.mod`). Renders an architectural flowchart at start and end and a live substep tracker that ticks after every substep, then produces a severity-rated finding list, a 0–10 trust score, top-3 critical risks, a remediation roadmap, AWS-control compliance mapping, live CVE/advisory cross-reference, and jurisdictional supply-chain risk screening anchored to OFAC/EU/UN/BIS sanctions frameworks. Invoke explicitly with `/mcp-trust`.
 ---
 
 # MCP-TRUST — Agentic AI Security Audit
 
 A structured security review of MCP servers, AI agents, and agentic OAuth flows
-against the threat taxonomy from the SANS / AWS 2025 whitepaper *"Navigating
+against the threat taxonomy from the SANS / AWS 2026 whitepaper *"Navigating
 modern application security challenges with evolved reliance on AI-based
 applications"* (Ahmed Abugharbia, SANS Institute), extended with a supply-chain
 and jurisdictional-risk layer that the whitepaper notes but does not codify
@@ -16,9 +16,82 @@ This skill is **not** a scanner. It is a senior-engineer-grade playbook loaded
 into Claude's context. Claude executes the audit using its built-in `Read`,
 `Grep`, and `WebFetch` tools — no external process, no credentials handled.
 
-The audit covers **48 substeps across 5 pillars**, plus a discovery phase
-and a scoring/reporting phase. Every finding is anchored to a named threat
-from the whitepaper or to a concrete external advisory / sanctions source.
+The audit covers **55 substeps across 5 pillars** (12 / 12 / 12 / 10 / 9),
+plus a discovery phase (6 substeps) and a scoring/reporting phase. Every
+finding is anchored to a named threat from the whitepaper or to a
+concrete external advisory / sanctions source.
+
+---
+
+## 0. Setup / Permissions (one-time)
+
+Claude Code skills cannot ship their own tool permissions via frontmatter.
+Phase 5.2 makes ~30 `WebFetch` calls per audit run against public security
+feeds; without an allow-list, the host prompts you for each one.
+
+Paste the block below into your `~/.claude/settings.json` `permissions.allow`
+array (one-time setup). All domains are read-only, public security data
+sources — no credentials are sent.
+
+```jsonc
+"WebFetch(domain:github.com)",
+"WebFetch(domain:raw.githubusercontent.com)",
+"WebFetch(domain:api.github.com)",
+"WebFetch(domain:nvd.nist.gov)",
+"WebFetch(domain:services.nvd.nist.gov)",
+"WebFetch(domain:cve.mitre.org)",
+"WebFetch(domain:www.cve.org)",
+"WebFetch(domain:osv.dev)",
+"WebFetch(domain:api.osv.dev)",
+"WebFetch(domain:deps.dev)",
+"WebFetch(domain:api.deps.dev)",
+"WebFetch(domain:pypi.org)",
+"WebFetch(domain:registry.npmjs.org)",
+"WebFetch(domain:www.npmjs.com)",
+"WebFetch(domain:crates.io)",
+"WebFetch(domain:pkg.go.dev)",
+"WebFetch(domain:rubygems.org)",
+"WebFetch(domain:rustsec.org)",
+"WebFetch(domain:security.snyk.io)",
+"WebFetch(domain:www.opencve.io)",
+"WebFetch(domain:www.cvedetails.com)",
+"WebFetch(domain:www.exploit-db.com)",
+"WebFetch(domain:kb.cert.org)",
+"WebFetch(domain:seclists.org)",
+"WebFetch(domain:vulhub.org)",
+"WebFetch(domain:www.hackerone.com)",
+"WebFetch(domain:www.bugcrowd.com)",
+"WebFetch(domain:thehackernews.com)",
+"WebFetch(domain:www.cisa.gov)",
+"WebFetch(domain:ossindex.sonatype.org)",
+"WebFetch(domain:avd.aquasec.com)",
+"WebFetch(domain:attackerkb.com)",
+"WebFetch(domain:googleprojectzero.blogspot.com)",
+"WebFetch(domain:research.jfrog.com)",
+"WebFetch(domain:www.tenable.com)",
+"WebFetch(domain:www.wiz.io)",
+"WebFetch(domain:msrc.microsoft.com)",
+"WebFetch(domain:socket.dev)",
+"WebFetch(domain:securityscorecards.dev)",
+"WebFetch(domain:api.securityscorecards.dev)",
+"WebFetch(domain:nodejs.org)",
+"WebFetch(domain:openjsf.org)",
+"WebFetch(domain:bleepingcomputer.com)",
+"WebFetch(domain:www.bleepingcomputer.com)",
+"WebFetch(domain:securelist.com)",
+"WebFetch(domain:isc.sans.edu)",
+"WebFetch(domain:krebsonsecurity.com)",
+"WebFetch(domain:sanctionssearch.ofac.treas.gov)",
+"WebFetch(domain:www.bis.doc.gov)",
+"WebFetch(domain:www.sanctionsmap.eu)",
+"WebFetch(domain:www.gov.uk)",
+"WebFetch(domain:www.un.org)",
+```
+
+If you skip this step, the audit still works — you'll just be asked to
+approve each fetch as it happens. To hard-disable Phase 5.2 instead,
+add `"WebFetch"` to `permissions.deny`; the audit will mark all of 5.2
+as `[~] live advisory feeds disabled`.
 
 ---
 
@@ -74,8 +147,8 @@ every `/mcp-trust` invocation.
 |   ;/           \   \ .'  `---'.|                          |   |.'    :  ,      .-./
 '---'             `---`      `---`                          `---'       `--`----'
 
-                Agentic AI Security Audit  ·  SANS / AWS 2025
-                48 substeps  ·  5 pillars  ·  live CVE + sanctions feeds
+                Agentic AI Security Audit  ·  SANS / AWS 2026
+                55 substeps  ·  5 pillars  ·  live CVE + sanctions feeds
 ```
 
 ### 2.1 Architectural flowchart (render at start and end)
@@ -83,7 +156,7 @@ every `/mcp-trust` invocation.
 ```
 +======================================================================+
 |                       MCP-TRUST AUDIT PIPELINE                       |
-|         SANS / AWS 2025  ·  4-Pillar Model  +  Supply Chain          |
+|         SANS / AWS 2026  ·  4-Pillar Model  +  Supply Chain          |
 +======================================================================+
 
                      [ codebase  +  package manifests ]
@@ -105,7 +178,7 @@ every `/mcp-trust` invocation.
  │     &       │             │      &      │             │   TRUST     │
  │ AUTHENTIC.  │             │ DELEGATION  │             │  BOUNDARY   │
  │             │             │             │             │             │
- │  12 steps   │             │  10 steps   │             │  10 steps   │
+ │  12 steps   │             │  12 steps   │             │  12 steps   │
  │             │             │             │             │             │
  │ OAuth · JWT │             │  Confused   │             │  Prompt &   │
  │  ETDI       │             │   deputy    │             │   data      │
@@ -126,7 +199,7 @@ every `/mcp-trust` invocation.
                 │     &       │           │   CHAIN     │
                 │  RUNTIME    │           │     &       │
                 │             │           │ DEPENDENCY  │
-                │ 10 steps    │           │  6 steps    │
+                │ 10 steps    │           │  9 steps    │
                 │             │           │             │
                 │ Logs · rate │           │  Live CVE   │
                 │ limit       │           │  feeds      │
@@ -154,10 +227,11 @@ every `/mcp-trust` invocation.
 
 ```
 +=================================================================+
-|                MCP-TRUST AUDIT MAP — SANS/AWS 2025              |
+|                MCP-TRUST AUDIT MAP — SANS/AWS 2026              |
 +=================================================================+
 |                                                                 |
 |  PHASE 0 — DISCOVERY                                            |
+|  [ ] 0.0  Scope declaration                                     |
 |  [ ] 0.1  Target classification (server / client / agent / mix) |
 |  [ ] 0.2  Transport detection (STDIO / SSE / Streamable HTTP)   |
 |  [ ] 0.3  Auth surface map (inbound / outbound / delegated)     |
@@ -189,6 +263,8 @@ every `/mcp-trust` invocation.
 |  [ ] 2.8  Call-stack verification                               |
 |  [ ] 2.9  Outbound credential pass-through                      |
 |  [ ] 2.10 Refresh-token rotation                                |
+|  [ ] 2.11 Tool consent boundary                                 |
+|  [ ] 2.12 Multi-turn authority persistence                      |
 |                                                                 |
 |  PHASE 3 — PILLAR 3: INPUT TRUST BOUNDARY                       |
 |  [ ] 3.1  Prompt-injection containment                          |
@@ -201,6 +277,8 @@ every `/mcp-trust` invocation.
 |  [ ] 3.8  Metadata-injection surface                            |
 |  [ ] 3.9  Input validation & sanitisation                       |
 |  [ ] 3.10 Tool-output reflection                                |
+|  [ ] 3.11 Resource URI trust                                    |
+|  [ ] 3.12 Sensitive result reflection                           |
 |                                                                 |
 |  PHASE 4 — PILLAR 4: OBSERVABILITY & RUNTIME                    |
 |  [ ] 4.1  Audit logging                                         |
@@ -221,6 +299,9 @@ every `/mcp-trust` invocation.
 |  [ ] 5.4  Typosquatting & namespace confusion                   |
 |  [ ] 5.5  Integrity & provenance                                |
 |  [ ] 5.6  Maintenance health                                    |
+|  [ ] 5.7  CI/CD and release-pipeline security                   |
+|  [ ] 5.8  Install-time and runtime dangerous behaviour          |
+|  [ ] 5.9  Supply-chain ownership & maintainership (technical)   |
 |                                                                 |
 |  PHASE 6 — SCORING & REPORTING                                  |
 |  [ ] 6.1  Severity normalisation                                |
@@ -431,13 +512,200 @@ For every substep:
 Every finding is recorded as a structured block:
 
 ```
-[<SEVERITY>] <pillar.substep>  <file>:<line>
-  threat:    <named threat from whitepaper or external source>
-  evidence:  <the matched code / config / dep, ≤ 120 chars>
-  why:       <one sentence — the concrete attack this enables>
-  fix:       <one sentence — actionable remediation>
-  anchor:    <whitepaper section reference or external URL>
+[<SEVERITY>] [<CONFIDENCE>] [<TYPE>]  <pillar.substep>  <file>:<line | n/a>
+  threat:        <named threat from whitepaper or external source>
+  evidence:      <the matched code / config / dep, ≤ 120 chars>
+  why:           <one sentence — the concrete attack this enables>
+  fix:           <one sentence — actionable remediation>
+  anchor:        <whitepaper section reference or external URL>
+  context:       <deployment-context modifier if it shifted severity — see 3.5.6>
+  compensating:  <named compensating control if severity was downgraded — see 3.5.7>
 ```
+
+`<SEVERITY>`   ∈ { CRITICAL, HIGH, MEDIUM, LOW }
+`<CONFIDENCE>` ∈ { CONFIRMED, STRONG_SIGNAL, WEAK_SIGNAL, UNKNOWN } — see 3.5.1
+`<TYPE>`       ∈ { DEFECT, RISK, GAP, OBSERVATION, QUESTION } — see 3.5.2
+
+---
+
+## 3.5  Audit methodology
+
+This section is the methodological frame that every Phase 1–5 substep
+inherits. It is the glue that prevents the audit from emitting fake
+certainty: every grep hit must justify itself, every runtime claim must
+declare whether it is actually evidenced from the repository, and every
+emitted item must declare whether it is a real defect or a question for
+human review.
+
+The seven sub-blocks below are foundational — they retroactively temper
+every existing pillar rubric. A rule in Phase 1–5 that says "missing X
+= HIGH" still fires, but it now fires with a confidence and a finding
+type, and is silently downgraded to a `QUESTION` when the underlying
+evidence is unverifiable from the repo alone.
+
+### 3.5.1  Evidence confidence model
+
+Severity alone is not enough. Every finding **must** also carry a
+confidence rating that states how much of the conclusion is supported
+by direct repository evidence vs inference vs absence-of-evidence.
+
+| Confidence | When to use |
+|---|---|
+| **CONFIRMED**     | The matched line, config value, or advisory record itself proves the issue (e.g. `verify_signature=False` is in the executed path; `axios@0.27.2` is in `package-lock.json` and the CVE's affected range covers it). |
+| **STRONG_SIGNAL** | Multiple consistent indicators in code/config strongly suggest the issue, but full exploitability or runtime posture is not proven from the repo (e.g. wildcard CORS combined with no auth check, but the deployed reverse-proxy configuration is not in the repo). |
+| **WEAK_SIGNAL**   | A single heuristic indicator (one grep hit, one suspicious symbol) with no semantic confirmation. Triage signal only — must be elevated by manual validation before it can drive scoring. |
+| **UNKNOWN**       | The control cannot be verified from repository evidence alone. Typical for runtime, deployment, observability, isolation, log-sink, anomaly-detection, and revocation claims. |
+
+**Hard rules:**
+- A grep hit, by itself, is at most `WEAK_SIGNAL` unless the matched line literally proves the insecure behaviour.
+- Absence of code evidence for a *runtime* control is `UNKNOWN`, not "the control is missing." A repo may simply not contain the deployment manifest.
+- Findings whose confidence is `UNKNOWN` **do not deduct from the trust score** (see 3.5.3) — they are emitted as review questions instead.
+
+### 3.5.2  Finding types taxonomy
+
+In addition to severity and confidence, every emitted item is tagged
+with a finding *type*. This stops every observation from being
+mis-rendered as a "LOW finding."
+
+| Type | Meaning |
+|---|---|
+| **DEFECT**      | Directly evidenced security flaw with a plausible, named exploit path. |
+| **RISK**        | Risky design or architectural choice that creates a plausible exploit path under realistic conditions, but the flaw itself is not yet manifest. |
+| **GAP**         | Missing control or hardening measure. The system is not necessarily broken — it lacks defence-in-depth. |
+| **OBSERVATION** | A condition worth noting that may inform risk but is not itself a defect, risk, or gap (e.g. "single maintainer, actively maintained"). |
+| **QUESTION**    | Repository evidence is insufficient; needs human confirmation. Emitted into the Manual Validation appendix, not the pillar finding lists. |
+
+**Worked re-classifications** (these are real past failure modes —
+items that previous versions of this skill emitted as score-deducting
+findings, but which under this taxonomy are tagged correctly):
+
+| Item | Was | Is now |
+|---|---|---|
+| Protected, rate-limited DCR endpoint                            | LOW finding | `OBSERVATION` — secure state, not a finding |
+| Single-maintainer dep, actively maintained                      | LOW finding | `OBSERVATION` |
+| Maintainer jurisdiction unknown                                 | MEDIUM finding | `QUESTION` (manual review) |
+| No anomaly detection visible in repo                            | HIGH finding | `QUESTION` (runtime, not evidenced from repo) |
+| ETDI tool definitions unsigned (registry not runtime-mutable)   | HIGH finding | `GAP` MEDIUM (advanced hardening) |
+| ETDI + tool registry mutable at runtime by unauth callers       | HIGH finding | `DEFECT` CRITICAL (rug-pull precondition) — unchanged |
+
+### 3.5.3  Do not score unknowns
+
+`QUESTION`-typed and `UNKNOWN`-confidence items **do not reduce the
+trust score**. They surface in the report only as:
+- "Manual validation required" appendix entries
+- "Open review questions" enumerations
+- "Operational gaps to confirm" notes
+
+Rationale: the score is meant to reflect security posture *that the
+audit can verify*. Folding unverifiable claims into the score
+manufactures false precision and rewards confident-sounding guesses.
+
+### 3.5.4  Heuristic match validation rules
+
+Grep signatures throughout this skill are **triage**, not proof. Before
+emitting a finding from a grep hit, all four conditions must hold:
+
+1. The matched line is **executable code or active configuration** —
+   not a comment, docstring, test fixture, example file, README
+   excerpt, or migration that has been removed.
+2. The matched symbol is **security-relevant in context** — e.g.
+   `verify=False` matters in `jwt.decode(...)`; the same string in a
+   test that only asserts schema does not.
+3. The surrounding code path is **reachable** — the matched line is
+   not dead code, behind an `if False:` guard, or otherwise
+   unreachable from any entry point.
+4. The insecure behaviour is **not contradicted** by nearby
+   validation, framework defaults, or wrapper logic that already
+   sanitises the input.
+
+If any condition fails:
+- Demote to `OBSERVATION` (still record, but not as a finding), **or**
+- Convert to `QUESTION` (manual validation required), **or**
+- Discard the hit entirely.
+
+**Conversely:** absence of grep hits is *not* evidence of safety. It
+only means the specific signature did not match. A negative grep
+result is recorded as `coverage: heuristic` in the substep summary,
+not as `status: clean`.
+
+### 3.5.5  Automatic fail conditions
+
+Regardless of trust-score arithmetic, the audit **must** mark the
+target as `FAIL — manual remediation required` if any of the
+following are present at `CONFIRMED` confidence:
+
+- JWT signature verification disabled (`verify=False`,
+  `algorithms=["none"]`, `verify_signature=False`)
+- Public OAuth client without PKCE
+- Wildcard / prefix / substring redirect-URI matching
+- User bearer token forwarded downstream as-is to third-party services
+- Plain-HTTP-bound remote MCP endpoint (Streamable HTTP without TLS)
+- Remotely reachable privileged MCP endpoint with no authentication
+- Hardcoded live cloud / SaaS / git-provider credential in repository
+- Direct dependency version confirmed in the affected range of a
+  CISA-KEV-listed CVE
+- Unauthenticated runtime mutation of tool definitions or registry
+  (rug-pull precondition)
+
+A FAIL caps the trust band at "high risk — do not deploy" regardless
+of the numeric score. The triggering condition is named explicitly in
+the report's "Top 3 critical risks" block, and the fail is recorded as
+the first line of the Trust-score panel:
+`AUTO-FAIL: <triggering condition>`.
+
+### 3.5.6  Deployment context modifiers
+
+Severity is not context-free. Before scoring, classify the target:
+
+| Context | Description |
+|---|---|
+| **LOCAL_DEV**            | Loopback-only; single developer; not network-reachable. |
+| **INTERNAL_SINGLE_USER** | Internal network; one human user; behind a corporate-auth boundary. |
+| **INTERNAL_MULTI_USER**  | Internal network; multiple users; some lateral exposure. |
+| **EXTERNAL_PRODUCTION**  | Public internet; multi-tenant or unauthenticated reachable surface. |
+
+The classification is recorded **once** in the report header
+(`Deployment context: <CONTEXT>`); individual findings do not need to
+repeat it. They reference it only when context shifted their severity,
+via the `context:` line in the finding record.
+
+Severity adjustments:
+- Findings predicated on **network exposure** (CORS, `Origin`, `0.0.0.0`
+  bind) are demoted by one level when the context is `LOCAL_DEV` and
+  the binding is loopback-only.
+- Findings predicated on **browser reachability** require the deployed
+  endpoint to be reachable from a browser; for STDIO-only transports,
+  such findings may be inapplicable (`[~]`).
+- Findings on **operational / runtime** controls (logging sinks,
+  anomaly detection, revocation infrastructure, sandboxing) demand
+  stricter posture for `EXTERNAL_PRODUCTION` than for `LOCAL_DEV`,
+  and at `LOCAL_DEV` typically convert to `QUESTION` rather than
+  scored finding.
+
+### 3.5.7  Compensating controls
+
+Severity may be downgraded by **at most one level** when a directly
+evidenced compensating control materially blocks the exploit path.
+The compensating control must be named in the finding's
+`compensating:` line.
+
+Examples of legitimate compensation:
+- Missing `Origin`-header validation **may** drop from CRITICAL → HIGH
+  if the endpoint is loopback-only and not browser-reachable.
+- Broad tool scope **may** drop from HIGH → MEDIUM if every privileged
+  call requires explicit user re-confirmation gated by runtime policy.
+- Long access-token TTL **may** drop from MEDIUM → LOW if the token
+  is audience-bound, device-bound, and revocable with active
+  monitoring.
+
+**Hard rules:**
+- Never downgrade below `LOW`.
+- Never downgrade a confirmed cryptographic or authentication defect
+  (disabled signature verification, `alg=none`, predictable `state`)
+  on the strength of monitoring alone — monitoring detects exploits,
+  it does not prevent them.
+- Auto-fail triggers (3.5.5) **cannot** be compensated. Compensating
+  controls reduce severity, never the auto-fail status.
 
 ---
 
@@ -445,6 +713,55 @@ Every finding is recorded as a structured block:
 
 Goal: classify the target and decide which substeps apply. Some substeps may
 be marked `[~]` (skipped) if the target lacks the relevant surface.
+
+### 0.0 Scope declaration
+
+Before any discovery work, declare and print the audit scope. This is
+how the report avoids claiming complete coverage when key inputs are
+missing. Render the block below at audit start; copy its values into
+the final-report header (Section 11).
+
+Required fields:
+
+- **Path reviewed**         — absolute or repo-relative path the audit examined.
+- **Files inspected**       — count of source files read, with breakdown by language.
+- **Manifests detected**    — every dep manifest found (`package.json`, `pyproject.toml`, `Cargo.lock`, etc.).
+- **Lockfiles available**   — yes / partial / no. If `no`, Phase 5 cannot resolve transitive deps and 5.2 coverage is reduced.
+- **Transport surfaces**    — STDIO / SSE / Streamable HTTP / multiple / none.
+- **Auth config present**   — yes / partial / no. If `no`, Pillar 1 findings on configured-state controls become `QUESTION` per 3.5.2.
+- **Deployment manifests**  — Dockerfile, docker-compose, k8s manifests, Terraform, CDK, or none. If none, Pillar 4 runtime claims default to `UNKNOWN` confidence per 3.5.1.
+- **Web access enabled**    — yes / no. If `no`, Phase 5.2 / 5.3 fall back to in-context advisory data only and are flagged `coverage: heuristic` in the substep summary.
+- **Review classification** — `code-only` / `code+config` / `code+config+docs` / `full deployment evidence`.
+- **Deployment context**    — LOCAL_DEV / INTERNAL_SINGLE_USER / INTERNAL_MULTI_USER / EXTERNAL_PRODUCTION (per 3.5.6). If unstated by the user, infer from binds + transport + deploy manifests; record the inference and emit a confirmation question into the Manual Validation appendix (6.6).
+
+**Coverage rule:** if any field above is `no` or `partial`, name the
+specific phases or substeps whose coverage is reduced, and state in
+the final report that those substeps' negative results are
+`coverage: heuristic`, not `status: clean`.
+
+```
++======================================================================+
+|                       AUDIT SCOPE DECLARATION                        |
++======================================================================+
+  Path reviewed:         <abs / repo-relative path>
+  Files inspected:       <N> total  ·  <breakdown by language>
+  Manifests detected:    <list>
+  Lockfiles:             <yes | partial | no>
+  Transport surfaces:    <list>
+  Auth config:           <yes | partial | no>
+  Deployment manifests:  <list or "none">
+  Web access:            <yes | no>
+  Review classification: <code-only | code+config | code+config+docs |
+                          full deployment evidence>
+  Deployment context:    <LOCAL_DEV | INTERNAL_SINGLE_USER |
+                          INTERNAL_MULTI_USER | EXTERNAL_PRODUCTION>
+                          (inferred — confirm in Manual Validation)
+
+  Coverage caveats:
+    - <substep id>: <reason coverage is reduced>
+    - ...
++======================================================================+
+```
 
 ### 0.1 Target classification
 
@@ -463,7 +780,7 @@ several. Use Grep to find:
 Identify which MCP transport(s) the project uses:
 
 - **STDIO** — look for `stdio_server`, `stdio_client`, `subprocess`, server launched as child process
-- **SSE** (deprecated as of protocol 2025-03-26) — look for `sse_server`, `EventSource`, `text/event-stream`
+- **SSE** (deprecated as of protocol 2026-03-26) — look for `sse_server`, `EventSource`, `text/event-stream`
 - **Streamable HTTP** — look for `streamablehttp_server`, `StreamableHTTPServerTransport`, single MCP endpoint that accepts both POST and SSE responses
 
 If SSE is detected, raise an immediate **HIGH** finding under 1.1 — SSE is
@@ -499,7 +816,7 @@ rather than abstract ones.
 ## 5. PHASE 1 — Pillar 1: Identity & Authenticity
 
 > "Strong identity management is among the most important security measures
-> to prevent unauthorized access and tool impersonation." — SANS/AWS 2025, p.12
+> to prevent unauthorized access and tool impersonation." — SANS/AWS 2026, p.12
 
 ### 1.1  Transport security baseline
 
@@ -515,14 +832,14 @@ rather than abstract ones.
 **Severity rubric:**
 - **CRITICAL** — Streamable HTTP server bound to non-loopback address over
   plain HTTP.
-- **HIGH** — SSE transport in use after protocol 2025-03-26.
+- **HIGH** — SSE transport in use after protocol 2026-03-26.
 - **MEDIUM** — Session IDs from non-cryptographic RNG.
 - **LOW** — Hard-coded transport selection with no override.
 
 ### 1.2  OAuth 2.1 compliance
 
 **Threat anchor:** insufficient delegation security (whitepaper p.7, "March
-2025 MCP update mandates OAuth 2.1").
+2026 MCP update mandates OAuth 2.1").
 
 **Inspect:**
 - Use of OAuth 2.0 implicit grant or password grant — both removed in 2.1.
@@ -754,13 +1071,37 @@ AKIA[0-9A-Z]{16}
 - **HIGH** — placeholder credential with realistic prefix (`sk-`, `ghp_`, `xoxb-`).
 - **MEDIUM** — secrets read from `.env` committed without `.gitignore` entry.
 
+**Beyond-regex secret-handling inspection** (per 3.5.4: regex hits are
+triage; these checks supply the semantic confirmation):
+
+- `.env`, `secrets.toml`, `credentials.json`, `*.pem`, `*.key` files
+  tracked in git history (use `git log --all --full-history -- <path>`,
+  not just current tree).
+- Secrets passed into log statements, exception payloads, tracing
+  spans, debug output, or error messages — search for token-like
+  parameters reaching `log.*`, `print(`, `console.log(`, `span.*`,
+  `traceback`.
+- Secrets reflected into tests, fixtures, CI snapshots, or
+  documentation screenshots.
+- Cloud credentials (`AWS_ACCESS_KEY_ID`, GCP service-account JSON,
+  Azure SP secrets) used directly in code rather than via the
+  platform's managed-identity mechanism (IAM role, Workload Identity,
+  Managed Identity).
+- Sample / template config files that encourage plaintext secret
+  storage rather than referencing a secrets manager.
+
+**Confidence rule:** a plausible-looking secret string in docs / tests
+/ fixtures is `WEAK_SIGNAL`; elevate to `CONFIRMED` only when context
+strongly indicates active runtime use (e.g. the same value appears
+in a deploy manifest or env file referenced by the runtime).
+
 ---
 
 ## 6. PHASE 2 — Pillar 2: Least Privilege & Delegation
 
 > "AI systems must be designed with isolation and containment in mind. Agents
 > should operate in sandboxed environments such as micro-VMs to prevent
-> privilege escalation or cross-session data leakage." — SANS/AWS 2025, p.12
+> privilege escalation or cross-session data leakage." — SANS/AWS 2026, p.12
 
 ### 2.1  Tool scope sprawl
 
@@ -916,13 +1257,67 @@ including token theft and privilege escalation" (whitepaper p.7).
 - **HIGH** — refresh tokens never rotated.
 - **MEDIUM** — rotation present but no reuse detection alerting.
 
+### 2.11  Tool consent boundary
+
+**Threat anchor:** confused deputy via under-gated side-effectful tools;
+silent execution of destructive or external actions on behalf of a user
+who never explicitly approved them. Specific to MCP because tool
+invocations are model-driven and easily occur mid-conversation without
+clear consent UX.
+
+**Inspect:**
+- Tools with side effects (file write, network egress, payments,
+  identity manipulation, deletion, irreversible operations) callable
+  by the LLM without an explicit user-confirmation step.
+- No labelling or grouping that distinguishes read-only tools from
+  side-effectful ones in the registry / tool descriptions.
+- Same consent state covers both read and write actions (e.g. one
+  approval at session start authorises every subsequent tool call,
+  including destructive ones).
+- Side-effect classification missing from the tool inventory built in
+  Phase 0.4.
+
+**Severity rubric:**
+- **HIGH** — destructive or external-side-effect tools are callable by
+  the model with no consent boundary distinct from read tools.
+- **MEDIUM** — consent boundary exists but is granted globally at
+  session start and not re-asserted per privileged action.
+- **LOW** — read/write distinction exists but is not surfaced to the
+  user UI clearly.
+
+### 2.12  Multi-turn authority persistence
+
+**Threat anchor:** elevated authority granted in one conversation turn
+silently persists across later, unrelated turns, allowing prompt
+injection or tool poisoning in turn N to exploit privileges that the
+user only intended to grant for turn N − k.
+
+**Inspect:**
+- Tool-approval state stored at session level with no per-action expiry.
+- Privileged scopes / capabilities granted on one task carrying
+  unchanged into subsequent tasks initiated by the same session.
+- No re-consent prompt when the conversation context shifts subject
+  (different repo, different account, different tenant).
+- No audit log of *when* an elevated capability was first authorised
+  and what it was authorised for.
+- Persistent "remember my choice" approvals with no TTL or revocation UX.
+
+**Severity rubric:**
+- **HIGH** — privileged tool approval persists across unrelated future
+  turns without expiry or re-consent, and an attacker who controls
+  later input can reach that capability.
+- **MEDIUM** — approvals persist within a session but expire on
+  session end, with no per-task scoping.
+- **LOW** — approvals are per-task by default but there is no audit
+  trail of when each was granted.
+
 ---
 
 ## 7. PHASE 3 — Pillar 3: Input Trust Boundary
 
 > "Rigorous and dynamic input validation and sanitization help prevent
 > prompt manipulation, while zero-trust models ensure continuous verification
-> across every interaction." — SANS/AWS 2025, p.12
+> across every interaction." — SANS/AWS 2026, p.12
 
 ### 3.1  Prompt-injection containment
 
@@ -1078,6 +1473,93 @@ about the reflection mechanism).
 - **HIGH** — tool output concatenated raw into next user-or-system message.
 - **MEDIUM** — envelope present but no truncation policy.
 
+### 3.11  Resource URI trust
+
+**Threat anchor:** MCP `resource://` references (or equivalent
+resource identifiers) that escape their intended namespace and reach
+arbitrary local files, internal URLs, or cross-tenant resources. This
+is the MCP analogue of classic SSRF / path-traversal in resource
+servers.
+
+**Inspect:**
+- Resource handlers accept user-controlled URIs without
+  schema-allowlist enforcement (allowed schemes, allowed hosts,
+  allowed path prefixes).
+- Resource URIs can resolve to arbitrary filesystem paths
+  (path-traversal: `..`, absolute paths, symlink-following).
+- Resource URIs can resolve to internal-network URLs
+  (`http://169.254.169.254/`, `http://localhost:*`,
+  `http://10.*`, `http://*.svc.cluster.local`) — SSRF surface.
+- No tenant / workspace / scope check on resource access — a request
+  in tenant A can resolve a `resource://` from tenant B.
+- Resource resolver follows redirects without re-validating the
+  destination against the allowlist.
+
+**Severity rubric:**
+- **CRITICAL** — resource identifiers can escape the intended namespace
+  to read cross-tenant or arbitrary-host resources.
+- **HIGH** — resource resolver permits internal-network URIs / cloud
+  metadata endpoints with no allowlist.
+- **HIGH** — path-traversal possible in filesystem-backed resources.
+- **MEDIUM** — allowlist exists but redirects are followed without
+  re-validation.
+
+### 3.12  Sensitive result reflection
+
+**Threat anchor:** secrets, tokens, full filesystem paths, stack
+traces, internal URLs, or PII contained in tool outputs are reflected
+back into the model context (or to the user) without redaction. This
+turns a benign tool-call into a data-exfiltration channel any time
+the model is later asked to summarise or echo prior context.
+
+**Inspect:**
+- No redaction layer between tool output and the model's next prompt.
+- Tool results containing OAuth tokens, API keys, or session
+  identifiers are passed verbatim into the LLM context.
+- Stack traces from tool errors include absolute filesystem paths,
+  internal hostnames, or DB connection strings.
+- File-read tools return file contents that may contain credentials
+  without any pattern-based redaction.
+- HTTP-fetch tools surface request/response headers including
+  `Authorization`, `Cookie`, `Set-Cookie`.
+- PII (emails, phone numbers, IDs) in tool outputs not classified or
+  filtered before reaching the model.
+
+**Severity rubric:**
+- **HIGH** — confirmed flow where tool outputs containing tokens /
+  cloud-metadata / DB creds reach the model context unredacted.
+- **HIGH** — error-path stack traces reflected into model context with
+  internal infrastructure detail.
+- **MEDIUM** — no redaction layer, but no concrete sensitive-data sink
+  identified in current code paths.
+- **LOW** — redaction layer exists but pattern set is narrow (e.g.
+  catches `Authorization` but not `X-Api-Key`).
+
+> **Phase 3 procedure note — taint-trace requirement:** every Phase 3
+> finding above (3.1, 3.2, 3.3, 3.8, 3.10, 3.12) must record an
+> explicit taint-trace in the finding's `evidence:` line:
+>
+>     source  → transformation → sink
+>
+> where:
+>
+>   - **source** = web fetch result, user upload, tool output, MCP
+>     resource read, env var, file read, etc.
+>   - **transformation** = LLM processing, string concat, template
+>     interpolation, schema validation, redaction layer, etc.
+>   - **sink** = system prompt, tool argument, tool selection logic,
+>     authorisation decision, final user-visible response, downstream
+>     API call.
+>
+> The finding must also state whether each of the following is
+> present: **schema validation** at the boundary, **integrity marking**
+> on untrusted spans, **explicit trust-boundary crossing** in the
+> code, **user re-consent** before privileged action.
+>
+> Without a concrete source/transformation/sink trace, downgrade the
+> finding to `[QUESTION]` per 3.5.2 — speculative prompt-injection
+> findings without a traceable flow are not actionable.
+
 ---
 
 ## 8. PHASE 4 — Pillar 4: Observability & Runtime
@@ -1085,7 +1567,7 @@ about the reflection mechanism).
 > "End-to-end observability built on standardized telemetry enables visibility
 > into agent performance, usage, and anomalies. Privilege escalation
 > guardrails should flag risky data or control flows, while runtime monitoring
-> establishes behavioral baselines to detect anomalies." — SANS/AWS 2025, p.12
+> establishes behavioral baselines to detect anomalies." — SANS/AWS 2026, p.12
 
 ### 4.1  Audit logging
 
@@ -1231,7 +1713,7 @@ and privacy preserving audits").
 > This pillar inspects the **dependency surface itself** — not the code
 > that uses it.
 
-> **Scope note:** the SANS/AWS 2025 whitepaper acknowledges supply-chain
+> **Scope note:** the SANS/AWS 2026 whitepaper acknowledges supply-chain
 > attacks (tool poisoning, rug pulls — pillar 1 / pillar 3 here) but does
 > not codify a dependency-layer audit. Pillar 5 extends the framework with
 > industry-standard supply-chain practices anchored to NIST SP 800-161,
@@ -1278,6 +1760,21 @@ training-time knowledge. Vulnerability disclosures are continuous; a clean
 audit yesterday may be insecure today. Query a representative source from
 each tier below; do not stop at one source.
 
+**All sources below are free and have a public, unauthenticated path.**
+Two specific caveats on reachability and cost:
+
+- **GitHub GraphQL `securityAdvisories`** is free but rate-limits unauth
+  requests harshly (60/hr); set `GITHUB_TOKEN` for the 5,000/hr cap.
+- **Sonatype OSS Index** anonymous batch usage is free up to a fair-use
+  threshold; production volume requires a free account token.
+- **CISA KEV's HTML catalogue page 403s automated agents** — use the
+  JSON or CSV feed URLs in the Tier B table, both of which are
+  unauthenticated and reliably reachable.
+- **Vulhub, Exploit-DB, AttackerKB** sometimes geo-block or
+  cloudflare-challenge automated agents from certain regions; if a
+  fetch fails, fall back to the Tier A canonical source for the same
+  CVE — no finding should depend on a single source's reachability.
+
 **Tier A — Canonical / authoritative CVE databases** (always query):
 
 | Source | URL | Coverage |
@@ -1292,7 +1789,7 @@ that move from "theoretical" to "weaponised"):
 
 | Source | URL | Coverage |
 |---|---|---|
-| **CISA Known Exploited Vulnerabilities (KEV)** | https://www.cisa.gov/known-exploited-vulnerabilities-catalog | CVEs confirmed exploited in the wild — auto-CRITICAL if a dep is affected |
+| **CISA Known Exploited Vulnerabilities (KEV)** | JSON: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json · CSV: https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv | CVEs confirmed exploited in the wild — auto-CRITICAL if a dep is affected. The HTML catalogue page 403s automated agents; use the JSON or CSV feed instead. |
 | **Exploit Database** | https://www.exploit-db.com | Public PoC / exploit code; per-CVE search shows weaponisation maturity |
 | **CERT/CC Vulnerability Notes** | https://kb.cert.org/vuls | Coordinated-disclosure analysis with vendor responses |
 | **Full Disclosure Mailing List** | https://seclists.org/fulldisclosure | Earliest signal for some 0-days; useful for emerging-threat awareness |
@@ -1307,6 +1804,20 @@ free alerting):
 | **Snyk Vulnerability Database** | https://security.snyk.io | Cross-ecosystem with proprietary research; strong for open-source |
 | **Vulhub** | https://vulhub.org | Pre-built vulnerable environments — confirm exploitability of a finding without standing it up from scratch |
 
+**Tier C+ — Efficient bulk APIs** (prefer these for scale — one HTTP
+call covers many packages, vs. one fetch per package on the per-package
+GitHub Advisory pages):
+
+| Source | URL | Coverage |
+|---|---|---|
+| **OSV.dev batch query** | `POST https://api.osv.dev/v1/querybatch` | Send a JSON array of `{package, version}` → batched advisories. Single request can cover the whole dep tree. |
+| **GitHub GraphQL `securityAdvisories`** | `POST https://api.github.com/graphql` | API-paginated, filterable by `ecosystem`, `package`, `severity`, `publishedSince`. Needs a `GITHUB_TOKEN` (5,000 req/hr). The right tool when you need *all* advisories for an ecosystem — pulls the full ~5,000-advisory pip catalog without scraping 199 HTML pages. |
+| **deps.dev (Google)** | https://api.deps.dev/v3 | Free Google API; multi-ecosystem package metadata + advisories + dependency graph. Per-package: `https://api.deps.dev/v3/systems/<eco>/packages/<pkg>/versions/<ver>`. |
+| **GHSA bulk JSON** | https://github.com/github/advisory-database | Whole GitHub Advisory DB shipped as JSON files. Clone once (`git clone --depth 1`), grep offline — no rate limit, fully reproducible. |
+| **Sonatype OSS Index** | https://ossindex.sonatype.org/api/v3/component-report | Free REST API; batch endpoint accepts up to 128 PURL identifiers per call. |
+| **AquaSec AVD** | https://avd.aquasec.com | Aggregator with strong container-image and Kubernetes coverage; backs the `trivy` scanner. |
+| **Trivy DB** | https://github.com/aquasecurity/trivy-db | Distributed as OCI; the same DB `trivy` ships with — usable offline. |
+
 **Tier D — Ecosystem-specific advisory DBs** (query the matching tier
 for each manifest detected in 5.1):
 
@@ -1314,9 +1825,18 @@ for each manifest detected in 5.1):
 |---|---|---|
 | Python | PyPA Advisory Database | https://github.com/pypa/advisory-database |
 | npm | npm Security Advisories | https://www.npmjs.com/advisories |
+| Node.js runtime | Official Node.js vulnerability blog | https://nodejs.org/en/blog/vulnerability |
+| Node.js runtime | OpenJS Foundation security | https://openjsf.org/blog |
 | Rust | RustSec Advisory Database | https://rustsec.org/advisories |
 | Ruby | Ruby Advisory DB | https://github.com/rubysec/ruby-advisory-db |
 | Go | Go Vulnerability DB | https://pkg.go.dev/vuln |
+
+> Note for Node.js audits: npm-package CVEs and Node-runtime CVEs are
+> distributed separately. A `node:*` runtime issue won't appear in
+> `package-lock.json` advisory cross-references — check
+> `https://nodejs.org/en/blog/vulnerability` against the Node version
+> the project targets (read from `engines.node` in `package.json` or
+> the project's `.nvmrc`).
 
 **Tier E — Bug-bounty public-disclosure feeds** (catch issues that have
 been responsibly disclosed but are not yet CVE-assigned):
@@ -1329,9 +1849,67 @@ been responsibly disclosed but are not yet CVE-assigned):
 **Tier F — Emerging-threat news** (situational awareness for items not
 yet in CVE feeds):
 
-| Source | URL |
+| Source | URL | Notes |
+|---|---|---|
+| The Hacker News | https://thehackernews.com | Daily security news; broad coverage. |
+| Bleeping Computer | https://www.bleepingcomputer.com | Breach + vuln news, ransomware tracking. |
+| Securelist (Kaspersky) | https://securelist.com | Threat-actor research, APT reports. |
+| SANS Internet Storm Center | https://isc.sans.edu | Daily threat briefings; honeypot-derived signal. |
+| Krebs on Security | https://krebsonsecurity.com | Investigative reporting on incidents. |
+
+**Tier H — Real-time supply-chain attack detection** (catches malicious
+packages, typosquats, and credential-stealers within minutes of publish
+— before they show up in CVE feeds):
+
+| Source | URL | Notes |
+|---|---|---|
+| Socket.dev | https://socket.dev | Free public scanner. Per-package: `https://socket.dev/<eco>/package/<pkg>`. Strong on npm and PyPI. Catches install-script abuse, typosquats, and behavioural anomalies. |
+| OSSF Scorecard | https://securityscorecards.dev | Free, ranks repos on signed-releases, branch-protection, dangerous-workflows, etc. API: `https://api.securityscorecards.dev/projects/<repo>`. |
+| OpenSSF Allstar | https://github.com/ossf/allstar | Continuous-policy scanner the OSSF runs against participating repos. |
+
+**Tier G — Vendor / independent research disclosures** (often the first
+place a high-impact bug appears, weeks before NVD assigns a CVE):
+
+| Source | URL | Notes |
+|---|---|---|
+| AttackerKB (Rapid7) | https://attackerkb.com | Curated exploitability commentary — distinguishes "theoretical CVSS 9" from "actually weaponised tomorrow". |
+| Google Project Zero | https://googleprojectzero.blogspot.com | Elite bug-finders; long-form root-cause analyses. |
+| JFrog Security Research | https://research.jfrog.com/vulnerabilities | Independent research advisories, frequently catches typosquats and malicious packages. |
+| Tenable Research | https://www.tenable.com/security/research | Vendor advisories, often early. |
+| Wiz Threat Center | https://www.wiz.io/vulnerability-database | Strong on cloud-native and container-image issues. |
+| Microsoft MSRC | https://msrc.microsoft.com | Authoritative for any Microsoft-published package or runtime. |
+
+**Bulk ecosystem feeds — paginated GitHub Advisory walks** (catch advisories
+that affect *transitive* deps not on the per-package page list, and
+near-real-time disclosures the per-package crawl will miss):
+
+| Ecosystem | Paginated URL (sort by published, newest first) |
 |---|---|
-| The Hacker News | https://thehackernews.com |
+| pip (Python)  | https://github.com/advisories?query=ecosystem%3Apip&sort=published-desc |
+| npm           | https://github.com/advisories?query=ecosystem%3Anpm&sort=published-desc |
+| Maven         | https://github.com/advisories?query=ecosystem%3Amaven&sort=published-desc |
+| RubyGems      | https://github.com/advisories?query=ecosystem%3Arubygems&sort=published-desc |
+| crates.io     | https://github.com/advisories?query=ecosystem%3Arust&sort=published-desc |
+| Go            | https://github.com/advisories?query=ecosystem%3Ago&sort=published-desc |
+| NuGet         | https://github.com/advisories?query=ecosystem%3Anuget&sort=published-desc |
+| Composer (PHP)| https://github.com/advisories?query=ecosystem%3Acomposer&sort=published-desc |
+
+**Procedure for bulk ecosystem walk:**
+
+1. For each ecosystem detected in 5.1, fetch page 1 of the paginated URL
+   above. Extract every advisory row: `(GHSA, CVE, package, affected
+   versions, severity, published date)`.
+2. If the oldest advisory on the page is **newer than the cutoff** (default
+   90 days), fetch page 2 by appending `&page=2`. Repeat until either:
+   - the oldest advisory on the page is older than the cutoff, or
+   - 10 pages have been walked (hard cap to avoid runaway crawls).
+3. Build an in-memory map: `package → [advisories]`.
+4. Cross-reference the map against the **dep inventory from 5.1** —
+   direct *and* transitive deps. Any installed version inside an advisory's
+   affected range becomes a 5.2 finding.
+5. **Prefer Tier C+ for scale.** If the dep tree is large (>50 packages),
+   skip steps 1-4 and use a single OSV.dev `querybatch` POST instead — it
+   returns the same data in one round trip with no rate-limit concerns.
 
 **Per-package security-advisories pages** for high-profile packages
 (query when the dependency is on this list):
@@ -1359,25 +1937,50 @@ mcp (Python)     https://github.com/modelcontextprotocol/python-sdk/security/adv
 mcp (TS)         https://github.com/modelcontextprotocol/typescript-sdk/security/advisories
 ```
 
+**npmjs.com per-package Security tab** — for any npm package, the
+official registry page exposes a built-in `Security` tab integrated
+with Snyk data:
+
+```
+https://www.npmjs.com/package/<pkg>?activeTab=security
+```
+
+This is free, unauthenticated, and shows known vulns + dep issues +
+a package-health score in a single fetch. Use this as the per-package
+fallback for npm deps when the GitHub Advisory page returns sparse
+results — Snyk often has coverage GHSA does not.
+
 **Procedure for each direct dependency:**
 
-1. **Tier A query** — fetch advisories for the package from at least one
-   canonical source (NVD, MITRE CVE, GitHub Advisory DB, or OSV.dev).
-   Example: `https://github.com/advisories?query=<pkg>+ecosystem%3A<eco>`.
-2. **Tier B query** — cross-reference against CISA KEV (auto-escalate to
+> **Optimisation:** before walking per-package, do *one* Tier C+ batch call
+> (OSV.dev `querybatch` or Sonatype OSS Index batch) covering the entire
+> dep inventory from 5.1. That single call usually surfaces 80%+ of the
+> findings; the per-package walk below then targets only the residual.
+
+1. **Tier C+ batch** (preferred entry point) — POST the full
+   `{package, version}` list to https://api.osv.dev/v1/querybatch.
+   Record every returned advisory.
+2. **Bulk ecosystem walk** — for each ecosystem in 5.1, walk the paginated
+   GitHub Advisory feed (procedure above) back to the cutoff. Catches
+   transitive-dep issues missed by per-package crawling.
+3. **Tier A query** — for direct deps with no Tier C+ hit, fetch from at
+   least one canonical source (NVD, MITRE CVE, GitHub Advisory DB,
+   OSV.dev). Example: `https://github.com/advisories?query=<pkg>+ecosystem%3A<eco>`.
+4. **Tier B query** — cross-reference against CISA KEV (auto-escalate to
    CRITICAL if the CVE is on the KEV list); check Exploit-DB for public
    PoC code (escalate severity if weaponised exploit exists).
-3. **Tier C / Tier D** — query the matching ecosystem-specific source
-   from 5.1's ecosystem detection (PyPA for Python, npm advisories for
-   npm, RustSec for Rust, etc.) and an aggregator (Snyk or OpenCVE) to
-   catch advisories not yet propagated to Tier A.
-4. **Tier E (optional)** — for high-traffic / high-sensitivity packages,
+5. **Tier C / Tier D** — query an aggregator (Snyk, OpenCVE, AquaSec AVD)
+   and the matching ecosystem-specific source (PyPA, npm advisories,
+   RustSec, etc.) to catch advisories not yet propagated to Tier A.
+6. **Tier E (optional)** — for high-traffic / high-sensitivity packages,
    scan HackerOne Hacktivity for not-yet-CVE-assigned disclosures.
-5. **Per-package page** — if the package is on the high-profile list
+7. **Tier G (optional)** — for high-impact packages, sweep AttackerKB for
+   exploitability commentary that may upgrade severity beyond raw CVSS.
+8. **Per-package page** — if the package is on the high-profile list
    below, additionally fetch its dedicated security-advisories page.
-6. Compare the **installed version** against advisory affected-version
+9. Compare the **installed version** against advisory affected-version
    ranges.
-7. Record any matching advisories with full URL and CVE ID.
+10. Record any matching advisories with full URL and CVE ID.
 
 **Severity rubric** (pin to advisory metadata; do not invent severities):
 - **CRITICAL** — installed version is in the affected range of an advisory
@@ -1577,6 +2180,159 @@ internal package shadowing.
 - **LOW** — single-maintainer but actively maintained (last commit
   < 6 months).
 
+### 5.7  CI/CD and release-pipeline security
+
+**Threat anchor:** the build/release pipeline is the highest-leverage
+attack surface in the modern software supply chain. A compromise here
+ships malicious artifacts to every consumer of the package, often
+signed and provenance-stamped by the legitimate org. Anchored to NIST
+SP 800-218 (SSDF) and SLSA framework Levels 1–4.
+
+**Inspect:**
+- GitHub Actions / GitLab CI / CircleCI / other pipelines reference
+  third-party actions by **mutable refs** (`@main`, `@v1`, branch
+  names) rather than pinned commit SHAs.
+- Release workflows triggerable from **untrusted contexts**: PRs from
+  forks with access to release secrets, unprotected branches with
+  publish permissions, manual `workflow_dispatch` available to
+  non-maintainers.
+- Secrets injected into PR builds from forks (`pull_request_target`
+  misuse, `secrets:` scoped too broadly).
+- Release workflow not restricted to **protected branches / signed
+  tags** with required reviewers.
+- Package publish step **not gated by trusted publishing / OIDC**
+  (npm provenance attestations, PyPI Trusted Publishers, Sigstore).
+- Build artifacts produced from a **local workstation** rather than a
+  reproducible CI environment.
+- Pipeline executes `curl | bash`, `wget | sh`, or downloads-and-runs
+  remote scripts without integrity verification (`--checksum`,
+  `sha256sum -c`, signed releases).
+- `package-lock.json` / `poetry.lock` / `Cargo.lock` not honoured at
+  install time in CI (e.g. CI runs `npm install` not `npm ci`).
+- Workflow file permissions: `contents: write`, `id-token: write`,
+  `packages: write` granted at the workflow level rather than the
+  job level that needs them.
+
+**Grep targets:**
+```
+uses:\s+\S+@(main|master|HEAD|v\d+\s*$)
+pull_request_target
+permissions:\s*write-all
+npm install\b(?! --omit)
+```
+
+**Severity rubric:**
+- **CRITICAL** — package publishing can be triggered from an
+  untrusted PR context (fork PR can reach release secrets) or from
+  an unprotected branch.
+- **HIGH** — third-party CI actions referenced by mutable refs in a
+  release workflow.
+- **HIGH** — release published from local/manual process with no
+  CI-side provenance attestation.
+- **MEDIUM** — CI exists, but no artifact attestation, no signed
+  releases, and no protected-tag gate.
+- **MEDIUM** — `npm install` (instead of `npm ci`) in CI build/test.
+
+### 5.8  Install-time and runtime dangerous behaviour
+
+**Threat anchor:** dependencies (or the project itself) execute
+arbitrary code at install time, at import, or at first use — this
+runs *before* any sandbox or scanner you would otherwise rely on. The
+classic supply-chain weaponisation point: malicious package versions
+exfiltrate or persist via install hooks. Tools like Socket.dev (5.2,
+Tier H) catch many of these but the audit must inspect the project's
+own pipeline too.
+
+**Inspect:**
+- npm `preinstall`, `install`, `postinstall` scripts in
+  `package.json` of direct deps **and** the project itself; flag any
+  that invoke shell, network, filesystem outside the package
+  directory, or download-and-execute.
+- Python dynamic build backends (`pyproject.toml` `build-backend` set
+  to a remote / unfamiliar backend); legacy `setup.py` that runs
+  shell, `subprocess`, or network during install.
+- Cargo `build.rs` scripts performing network or shell operations
+  beyond local code generation.
+- Go `go generate` directives invoking shell during build.
+- Application code uses `eval`, `exec`, `Function(...)`, `vm.runIn*`,
+  Python `exec` / `eval` / `compile`, or `subprocess` /
+  `child_process` with arguments that include untrusted input.
+- Dynamic plugin / extension loading from remote URLs without
+  integrity verification.
+- Download-and-execute patterns at startup
+  (`urllib.request.urlopen(...).read() ; exec(...)`,
+  `fetch(...).then(eval)`).
+- Native add-ons (`*.node`, `*.so`) downloaded at install time without
+  hash verification.
+
+**Severity rubric:**
+- **CRITICAL** — remote code fetched and executed at install or
+  startup without integrity verification.
+- **HIGH** — install / postinstall scripts execute shell or network
+  operations not required for the build.
+- **HIGH** — untrusted input reaches `eval` / `exec` / `Function` /
+  subprocess in application code.
+- **MEDIUM** — dynamic plugin loading without integrity controls,
+  even if currently sourced from a trusted location.
+- **MEDIUM** — native add-on download at install time without checksum
+  pinning.
+
+### 5.9  Supply-chain ownership & maintainership risk (technical-signal model)
+
+> **Relationship to 5.3:** 5.3 frames jurisdictional risk via
+> sanctions / export-control frameworks — a *compliance* lens, often
+> driven by the deploying entity's legal posture. 5.9 frames
+> ownership/maintainership risk via *technical signals visible in the
+> repo and registry*. Both can fire on the same package; they are
+> orthogonal lenses, not duplicates. Per the methodology framework
+> (3.5.1, 3.5.2), 5.3 findings frequently land as `[QUESTION]
+> [UNKNOWN]` because maintainer location is unverifiable from
+> repo evidence alone, while 5.9 findings can reach `[CONFIRMED]`
+> from registry metadata.
+
+**Threat anchor:** account takeover of a maintainer; ownership
+transfer followed by a malicious release; "trust-handoff" attacks
+where a popular package changes hands and the new maintainer publishes
+a backdoored version (historical: `event-stream`, `coa`, `rc`,
+`ua-parser-js`, `ctx`).
+
+**Inspect** (per direct dep, prefer registry API over scraping):
+- **Maintainer turnover**: any maintainer added in the last 90 days
+  with publish rights.
+- **Ownership / scope transfer**: package owner or scope changed in
+  the last 180 days.
+- **Single privileged maintainer** with publish rights and no 2FA
+  enforced (where the registry exposes 2FA status).
+- **Release cadence anomalies**: long quiet period followed by a
+  sudden release, especially with code-base churn.
+- **New maintainer + suspicious release**: a new maintainer was added
+  shortly before a release that introduces install hooks, network
+  calls, or obfuscated code.
+- **Release automation absent**: releases pushed manually from a
+  workstation with no CI evidence.
+- **Signing / provenance**: package releases unsigned and lacking
+  Sigstore / npm-provenance / PyPI-trusted-publishing attestation.
+- **Prior compromise history**: package has appeared in Snyk's malicious-
+  package list, GitHub's malicious-packages advisories, or Socket.dev's
+  alerts within the last 12 months.
+
+**Severity rubric:**
+- **CRITICAL** — confirmed malicious release, account takeover, or
+  ownership transfer followed by demonstrably suspicious package
+  behaviour. (Always fires regardless of compensating controls per
+  3.5.7; this is also an auto-fail trigger candidate per 3.5.5.)
+- **HIGH** — single privileged maintainer **and** unsigned releases
+  **and** recent ownership change or anomalous release pattern.
+- **MEDIUM** — single privileged maintainer without provenance /
+  signing and low transparency, no recent anomaly.
+- **LOW** — unsigned but stable project with multi-maintainer
+  oversight (this is informational, not a defect — emit as
+  `OBSERVATION` per 3.5.2).
+
+**Reporting note:** jurisdictional signals (5.3) must remain in a
+separate `Compliance / legal review note` block in the report. Never
+infer a 5.9 finding from a 5.3 jurisdictional tier alone.
+
 ---
 
 ## 10. PHASE 6 — Scoring & Reporting
@@ -1625,6 +2381,36 @@ Group remediations into three buckets:
 - **Strategic (1+ quarter)** — sandbox migration, PBAC rollout, AI-native
   detection layer, supply-chain attestation enforcement.
 
+**Remediation quality rules** — every remediation entry must satisfy
+all of the following:
+
+1. **Minimal but actionable.** State the smallest change that closes
+   the threat. A header flag beats a refactor when both suffice.
+2. **Proportional to the threat.** Do not recommend rearchitecture for
+   a config issue. Do not recommend advanced controls (PBAC, micro-VM,
+   AI-native detection) as the *baseline* fix for a flaw that has a
+   simpler proven mitigation.
+3. **Explicit about location.** Name the file, config block, or
+   pipeline step the change applies to. "Tighten validation" is not
+   a remediation; "set `additionalProperties: false` on the
+   `tool_call_args` schema in `tools/schema.py:48`" is.
+4. **Explicit about kind.** Tag each entry as one of:
+   `code-change` / `config-change` / `pipeline-change` /
+   `runtime-policy-change` / `process-change`. Pipeline and runtime
+   changes are operational and require coordination beyond the repo.
+5. **Honest about dependencies.** If a remediation requires an
+   operational control the audit could not verify (e.g. "rotate
+   refresh tokens at the IDP"), state explicitly that the fix has
+   a runtime / IDP dependency outside the repo and link it to the
+   relevant Manual Validation question.
+6. **No fixes for non-findings.** If the finding became
+   `[OBSERVATION]` or `[QUESTION]` under 3.5.2, it does not appear
+   in the roadmap — it appears in the Manual Validation appendix.
+7. **No invented controls.** Do not propose a control that the
+   ecosystem doesn't ship (e.g. "enforce ETDI" when the SDK has no
+   ETDI primitives) without flagging it as `Strategic — requires
+   upstream protocol support`.
+
 ### 6.5  Compliance mapping & AWS Marketplace pointer
 
 Map each finding category to:
@@ -1659,15 +2445,29 @@ then emit the report:
 ```
 +=================================================================+
 |              MCP-TRUST AUDIT REPORT — <project name>            |
-|              SANS/AWS 2025 agentic-AI threat taxonomy           |
+|              SANS/AWS 2026 agentic-AI threat taxonomy           |
 |              + Supply Chain & Dependency Security extension     |
 +=================================================================+
 
+Path reviewed:          <abs / repo-relative path>
 Target classification:  <server | client | host | agent | mix>
+Deployment context:     <LOCAL_DEV | INTERNAL_SINGLE_USER |
+                         INTERNAL_MULTI_USER | EXTERNAL_PRODUCTION>
 Transports detected:    <STDIO | SSE-deprecated | StreamableHTTP>
-Substeps executed:      <N> / 48
+Lockfiles available:    <yes | partial | no>
+Web access at audit:    <yes | no>
+Review classification:  <code-only | code+config | code+config+docs |
+                         full deployment evidence>
+Substeps executed:      <N> / 55
 Substeps skipped:       <N>     reason: <not applicable to target>
-Findings:               <N total — C critical / H high / M medium / L low>
+
+AUTO-FAIL:              <none | <triggering condition per 3.5.5>>
+
+Findings (scored):      <N total — C critical / H high / M medium / L low>
+                        DEFECT  : <N>      RISK : <N>      GAP : <N>
+Findings (unscored):    <N> — <N OBSERVATION + N QUESTION>
+                        (see Manual Validation appendix below; per 3.5.3
+                         these do NOT deduct from the trust score)
 
 PILLAR 1 — Identity & Authenticity                  [findings: N]
   [CRITICAL] 1.3  src/auth.py:42  redirect_uri uses prefix match
@@ -1738,12 +2538,86 @@ COMPLIANCE MAPPING
                 GuardDuty Malware Protection
                 Frameworks: NIST SP 800-161, EO 14028, OFAC/EU/UN/BIS
 
+SAFE DEFAULTS SUMMARY
+  Auth required by default:           <yes | no | unknown>
+  Remote bind disabled by default:    <yes | no | unknown>
+  TLS expected for remote use:        <yes | no | unknown>
+  PKCE enforced on public clients:    <yes | no | unknown | n/a>
+  Tool inputs schema-validated:       <yes | partial | no | unknown>
+  Tool outputs integrity-marked:      <yes | no | unknown>
+  User -> agent delegation bound:     <yes | no | unknown>
+  Refresh tokens rotated + reuse-detected:  <yes | no | unknown>
+  Outbound credentials JIT-issued:    <yes | no | unknown>
+  Dependency lockfile present:        <yes | no>
+  CI release protections present:     <yes | no | unknown>
+  SBOM produced + attached to release: <yes | no | unknown>
+
+  Decision rule: a row is "yes" only when CONFIRMED from repo
+  evidence. CONFIG_CONFIRMED counts as "yes". DEPLOYMENT_ASSUMED or
+  UNKNOWN renders as "unknown" — those become Manual Validation
+  questions below.
+
+MANUAL VALIDATION REQUIRED
+  These items could not be verified from repository evidence alone.
+  Each is a [QUESTION] [UNKNOWN] item per 3.5.2 / 3.5.1, and per 3.5.3
+  none of them deduct from the trust score above. They are listed
+  here so the deploying engineer can confirm or rebut each one before
+  go-live.
+
+  Runtime / deployment posture
+    [ ] Is the production MCP endpoint exposed beyond loopback?
+    [ ] Is TLS terminated before the MCP service?
+    [ ] Are audit logs shipped to an immutable / append-only sink?
+    [ ] Are refresh tokens rotated and reuse-detected in production?
+    [ ] Are revocation checks enforced at token validation time?
+    [ ] Are tool invocations subject to runtime authorisation checks?
+    [ ] Are sandboxing / micro-VM guarantees enforced by the deploy
+        platform?
+    [ ] Is anomaly detection enabled in production telemetry?
+    [ ] Is rate-limiting active on inbound MCP and auth endpoints?
+    [ ] Are session-IDs bound to authenticated user identity at the
+        gateway layer?
+    [ ] Is `Last-Event-ID` integrity-checked on stream resumption?
+
+  Supply chain / release posture
+    [ ] Are SBOMs generated in CI and attached to releases?
+    [ ] Are package signatures / provenance attestations verified
+        in CI/CD before deploy?
+    [ ] Is the release pipeline restricted to protected branches/tags?
+    [ ] Is package publishing gated by trusted-publishing / OIDC?
+    [ ] Is the lockfile honoured at install time in CI and prod?
+
+  Identity / delegation posture
+    [ ] Are outbound tokens audience-bound and short-lived in
+        production?
+    [ ] Is the identity provider's token-revocation feed consumed?
+    [ ] Are JWT signing keys rotated on schedule with key-id pinning?
+    [ ] Are user identity AND agent identity both present in the
+        delegation token used for tool calls?
+
+  Inferred items requiring confirmation
+    [ ] Deployment context inferred as <classification> — confirm.
+    [ ] Lockfile-derived dep tree assumed authoritative — confirm CI
+        installs from the lockfile, not the manifest, in production.
+    [ ] Maintainer jurisdictional notes (5.3) are compliance hints,
+        not security findings — confirm with legal/compliance if the
+        deploying entity has jurisdictional restrictions.
+
+OPEN REVIEW QUESTIONS (additional UNKNOWN-confidence items)
+  - <substep>: <one-line description>
+  - ...
+
+OPERATIONAL GAPS TO CONFIRM
+  - <substep>: <one-line description of the gap and why repo can't
+    verify it>
+  - ...
+
 +=================================================================+
 | Vetted security tooling:                                        |
 |   https://aws.amazon.com/marketplace/solutions/security/        |
 |                                                                 |
 | Source taxonomy:                                                |
-|   SANS / AWS (2025) "Navigating modern application security     |
+|   SANS / AWS (2026) "Navigating modern application security     |
 |   challenges with evolved reliance on AI-based applications"    |
 |   - Ahmed Abugharbia, SANS Institute                            |
 |                                                                 |
@@ -1756,8 +2630,13 @@ COMPLIANCE MAPPING
 |   Canonical:   NVD, MITRE CVE, GitHub Advisory DB, OSV.dev      |
 |   Exploitation: CISA KEV, Exploit-DB, CERT/CC, Full Disclosure  |
 |   Aggregators: CVEdetails, OpenCVE, Snyk, Vulhub                |
+|   Bulk APIs:   OSV.dev querybatch, deps.dev, GHSA bulk JSON,    |
+|                Sonatype OSS Index, AquaSec AVD, Trivy DB        |
 |   Bug bounty:  HackerOne Hacktivity, Bugcrowd                   |
+|   Vendor R&D:  AttackerKB, Project Zero, JFrog Research,        |
+|                Tenable, Wiz, MSRC                               |
 |   News:        The Hacker News                                  |
+|   Bulk feeds:  GitHub Advisory paginated walks per ecosystem    |
 |                                                                 |
 | MCP specification:                                              |
 |   https://modelcontextprotocol.io                               |
