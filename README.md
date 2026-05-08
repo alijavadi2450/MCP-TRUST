@@ -17,11 +17,14 @@
 
 # MCP-TRUST
 
-A commercial-grade Claude Code **skill** that runs a **42-substep security
+A commercial-grade Claude Code **skill** that runs a **48-substep security
 audit** of MCP (Model Context Protocol) servers, AI agents, and agentic OAuth
 flows against the threat taxonomy from the SANS / AWS 2025 whitepaper
 *"Navigating modern application security challenges with evolved reliance on
-AI-based applications"* (Ahmed Abugharbia, SANS Institute).
+AI-based applications"* (Ahmed Abugharbia, SANS Institute), extended with a
+supply-chain layer that pulls **live CVE / advisory feeds** at audit time and
+performs **jurisdictional supply-chain risk screening** anchored to OFAC, EU,
+UN, and US BIS sanctions frameworks.
 
 > Skill, not MCP server — the audit logic is a markdown playbook loaded into
 > Claude's context. Zero install footprint. Zero network surface. No
@@ -31,11 +34,18 @@ AI-based applications"* (Ahmed Abugharbia, SANS Institute).
 
 ## What you get
 
-- A **live audit map** rendered at the start, after every substep, and at the
-  end — so you always know where the audit is, what cleared, and what is in
-  progress.
-- **42 substeps across 4 pillars**, every one anchored to a named threat from
-  the whitepaper.
+- An **architectural flowchart** of the audit pipeline at start and end, plus
+  a **live substep tracker** rendered after every substep — so you always
+  know where the audit is, what cleared, and what is in progress.
+- **48 substeps across 5 pillars**, every one anchored to a named threat
+  from the whitepaper or to a concrete external advisory / sanctions source.
+- **Live CVE & advisory cross-reference** — fetches at audit time from NVD,
+  MITRE CVE, GitHub Advisory DB, OSV.dev, CISA KEV, Exploit-DB, CERT/CC,
+  Snyk, OpenCVE, CVEdetails, ecosystem-specific advisory DBs, HackerOne /
+  Bugcrowd public disclosures, and per-package security-advisory pages.
+- **Jurisdictional supply-chain risk screening** anchored to OFAC SDN, EU
+  Sanctions Map, UN Consolidated List, US BIS Entity List, NIST SP 800-161,
+  and US Executive Order 14028.
 - **Per-finding severity rubric** (CRITICAL / HIGH / MEDIUM / LOW) with
   explicit criteria, not vibes.
 - **Trust score 0–10**, weighted, with a five-band production-readiness rating.
@@ -52,9 +62,10 @@ AI-based applications"* (Ahmed Abugharbia, SANS Institute).
 | **2. Least privilege & delegation** | 10 | Tool scope sprawl, **confused deputy**, authenticated delegation, JIT credentials, cross-agent isolation, sandboxing & ephemeral sessions, PBAC, call-stack verification, outbound credential pass-through, refresh-token rotation |
 | **3. Input trust boundary** | 10 | **Prompt injection** containment, **unsafe data flow**, **unsafe control flow**, Origin header validation, local-bind safety, **tool poisoning**, **rug pull**, metadata injection, input validation, tool-output reflection |
 | **4. Observability & runtime** | 10 | Audit logging, rate limiting, behavioural baselines, privilege-escalation guardrails, session-ID binding, stream-resumption integrity, revocation capability, AI-native threat detection, telemetry standardisation, forensic capability |
+| **5. Supply chain & dependency** | 6 | Manifest inventory, **live CVE / advisory cross-reference** (NVD, MITRE, GitHub Advisory DB, OSV.dev, CISA KEV, Exploit-DB, CERT/CC, Snyk, OpenCVE, CVEdetails, ecosystem DBs, per-package advisories, HackerOne, Bugcrowd, Hacker News), **jurisdictional sanctions screening** (OFAC / EU / UN / BIS), typosquatting & namespace confusion, integrity & provenance (SBOM, signed releases), maintenance health |
 
 Plus **Phase 0** (target classification, transport detection, auth-surface
-mapping, tool inventory, trust-boundary diagram) and **Phase 5** (severity
+mapping, tool inventory, trust-boundary diagram) and **Phase 6** (severity
 normalisation, trust-score computation, top-3 risks, remediation roadmap,
 compliance mapping).
 
@@ -63,22 +74,38 @@ compliance mapping).
 ## Audit flow at a glance
 
 ```
-PHASE 0  Discovery        ──▶  classify target, map auth surface
-   │
-   ▼
-PHASE 1  Pillar 1         ──▶  Identity & Authenticity        (12 substeps)
-   │
-   ▼
-PHASE 2  Pillar 2         ──▶  Least Privilege & Delegation   (10 substeps)
-   │
-   ▼
-PHASE 3  Pillar 3         ──▶  Input Trust Boundary           (10 substeps)
-   │
-   ▼
-PHASE 4  Pillar 4         ──▶  Observability & Runtime        (10 substeps)
-   │
-   ▼
-PHASE 5  Scoring & Reporting   trust score, top-3, roadmap, compliance map
+                   [ codebase + package manifests ]
+                                │
+                                ▼
+                   ┌────────────────────────┐
+                   │  PHASE 0 · DISCOVERY   │
+                   └────────────┬───────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+ ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+ │  PHASE 1    │         │  PHASE 2    │         │  PHASE 3    │
+ │  IDENTITY   │         │  PRIVILEGE  │         │   INPUT     │
+ │ 12 substeps │         │ 10 substeps │         │ 10 substeps │
+ └──────┬──────┘         └──────┬──────┘         └──────┬──────┘
+        └───────────────────────┼───────────────────────┘
+                                │
+                ┌───────────────┴───────────────┐
+                ▼                               ▼
+         ┌─────────────┐                 ┌─────────────┐
+         │  PHASE 4    │                 │  PHASE 5    │
+         │ OBSERVE &   │                 │  SUPPLY     │
+         │  RUNTIME    │                 │   CHAIN     │
+         │ 10 substeps │                 │ 6 substeps  │
+         └──────┬──────┘                 └──────┬──────┘
+                └───────────────┬───────────────┘
+                                ▼
+                   ┌────────────────────────┐
+                   │  PHASE 6 · SCORE &     │
+                   │           REPORT       │
+                   └────────────┬───────────┘
+                                ▼
+                  [ commercial-grade audit report ]
 ```
 
 Each substep ticks the audit map as it completes:

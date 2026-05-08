@@ -1,6 +1,6 @@
 ---
 name: mcp-trust
-description: Commercial-grade security audit playbook for MCP (Model Context Protocol) servers, AI agents, and agentic OAuth flows. Walks four threat pillars from the SANS/AWS 2025 whitepaper "Navigating modern application security challenges with evolved reliance on AI-based applications" — Identity & Authenticity, Least Privilege & Delegation, Input Trust Boundary, and Observability & Runtime — across 42 named substeps. Auto-triggers on imports of `mcp`, `FastMCP`, `@modelcontextprotocol/sdk`; on `@mcp.tool` / `@mcp.resource` / `@mcp.prompt` handlers; on agentic OAuth artifacts (`redirect_uri`, `state=`, `code_verifier`, PKCE, `Mcp-Session-Id`); on multi-agent orchestration code (LangGraph, CrewAI, Strands, AutoGen); on Streamable HTTP / SSE transport implementations. Renders a live flowchart that ticks as substeps complete, then produces a severity-rated finding list, a 0–10 trust score, top-3 critical risks, a remediation roadmap, and a compliance mapping. Invoke explicitly with `/mcp-trust`.
+description: Commercial-grade security audit playbook for MCP (Model Context Protocol) servers, AI agents, and agentic OAuth flows. Walks 48 substeps across five pillars from the SANS/AWS 2025 whitepaper "Navigating modern application security challenges with evolved reliance on AI-based applications" plus a Supply Chain & Dependency layer — Identity & Authenticity, Least Privilege & Delegation, Input Trust Boundary, Observability & Runtime, and Supply Chain & Dependency Security. Auto-triggers on imports of `mcp`, `FastMCP`, `@modelcontextprotocol/sdk`; on `@mcp.tool` / `@mcp.resource` / `@mcp.prompt` handlers; on agentic OAuth artifacts (`redirect_uri`, `state=`, `code_verifier`, PKCE, `Mcp-Session-Id`); on multi-agent orchestration code (LangGraph, CrewAI, Strands, AutoGen); on Streamable HTTP / SSE transport implementations; and on the presence of dependency manifests (`package.json`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `go.mod`). Renders an architectural flowchart at start and end and a live substep tracker that ticks after every substep, then produces a severity-rated finding list, a 0–10 trust score, top-3 critical risks, a remediation roadmap, AWS-control compliance mapping, live CVE/advisory cross-reference, and jurisdictional supply-chain risk screening anchored to OFAC/EU/UN/BIS sanctions frameworks. Invoke explicitly with `/mcp-trust`.
 ---
 
 # MCP-TRUST — Agentic AI Security Audit
@@ -8,15 +8,17 @@ description: Commercial-grade security audit playbook for MCP (Model Context Pro
 A structured security review of MCP servers, AI agents, and agentic OAuth flows
 against the threat taxonomy from the SANS / AWS 2025 whitepaper *"Navigating
 modern application security challenges with evolved reliance on AI-based
-applications"* (Ahmed Abugharbia, SANS Institute).
+applications"* (Ahmed Abugharbia, SANS Institute), extended with a supply-chain
+and jurisdictional-risk layer that the whitepaper notes but does not codify
+into substeps.
 
 This skill is **not** a scanner. It is a senior-engineer-grade playbook loaded
-into Claude's context. Claude executes the audit using its built-in `Read` and
-`Grep` tools — no external process, no network calls, no credentials handled.
+into Claude's context. Claude executes the audit using its built-in `Read`,
+`Grep`, and `WebFetch` tools — no external process, no credentials handled.
 
-The audit covers **42 substeps across 4 pillars**, plus a discovery phase and a
-scoring/reporting phase. Every finding is anchored to a named threat from the
-whitepaper.
+The audit covers **48 substeps across 5 pillars**, plus a discovery phase
+and a scoring/reporting phase. Every finding is anchored to a named threat
+from the whitepaper or to a concrete external advisory / sanctions source.
 
 ---
 
@@ -33,6 +35,9 @@ whitepaper.
 - Multi-agent orchestration: `LangGraph`, `CrewAI`, `Strands`, `AutoGen`,
   `AgentCore`
 - Streamable HTTP or deprecated SSE transport implementations
+- Dependency manifests: `package.json`, `package-lock.json`, `yarn.lock`,
+  `pnpm-lock.yaml`, `requirements.txt`, `Pipfile.lock`, `pyproject.toml`,
+  `poetry.lock`, `Cargo.toml`, `go.mod`, `Gemfile.lock`, `pom.xml`
 
 **Manual invocation:** `/mcp-trust`. Optionally pass a path to scope the audit
 (e.g. `/mcp-trust src/server`).
@@ -41,10 +46,85 @@ whitepaper.
 
 ## 2. The audit map
 
-**Always render this map at the start of the audit, then redraw it after each
-substep with progress ticks.** This is the user's primary navigation aid — they
-must see exactly where the audit is, what has cleared, what is pending, and
-what is currently being inspected.
+The audit map has two views. The **architectural flowchart** is rendered
+once at the start and once at the end — it shows the audit pipeline as a
+connected graph. The **detailed substep tracker** is rendered at the start
+and re-rendered after every substep so the user always knows where the
+audit is.
+
+### 2.1 Architectural flowchart (render at start and end)
+
+```
++======================================================================+
+|                       MCP-TRUST AUDIT PIPELINE                       |
+|         SANS / AWS 2025  ·  4-Pillar Model  +  Supply Chain          |
++======================================================================+
+
+                     [ codebase  +  package manifests ]
+                                     │
+                                     ▼
+                       ┌────────────────────────┐
+                       │  PHASE 0 · DISCOVERY   │
+                       │  classify | scope | map│
+                       └────────────┬───────────┘
+                                    │
+                          target  +  transport
+                          +  auth surface  +  inventory
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+ ┌─────────────┐             ┌─────────────┐             ┌─────────────┐
+ │  PHASE 1    │             │  PHASE 2    │             │  PHASE 3    │
+ │  IDENTITY   │             │  PRIVILEGE  │             │   INPUT     │
+ │     &       │             │      &      │             │   TRUST     │
+ │ AUTHENTIC.  │             │ DELEGATION  │             │  BOUNDARY   │
+ │             │             │             │             │             │
+ │  12 steps   │             │  10 steps   │             │  10 steps   │
+ │             │             │             │             │             │
+ │ OAuth · JWT │             │  Confused   │             │  Prompt &   │
+ │  ETDI       │             │   deputy    │             │   data      │
+ │  COAT/CORF  │             │  JIT · PBAC │             │  injection  │
+ │  secrets    │             │  isolation  │             │  origin     │
+ └──────┬──────┘             └──────┬──────┘             └──────┬──────┘
+        │                           │                           │
+        └───────────────────────────┼───────────────────────────┘
+                                    │
+                       identity / privilege / input
+                       findings stream
+                                    │
+                       ┌────────────┴────────────┐
+                       ▼                         ▼
+                ┌─────────────┐           ┌─────────────┐
+                │  PHASE 4    │           │  PHASE 5    │
+                │  OBSERVE    │           │   SUPPLY    │
+                │     &       │           │   CHAIN     │
+                │  RUNTIME    │           │     &       │
+                │             │           │ DEPENDENCY  │
+                │ 10 steps    │           │  6 steps    │
+                │             │           │             │
+                │ Logs · rate │           │  Live CVE   │
+                │ limit       │           │  feeds      │
+                │ anomaly     │           │ Jurisdic-   │
+                │ revoke      │           │   tion      │
+                └──────┬──────┘           └──────┬──────┘
+                       │                         │
+                       └────────────┬────────────┘
+                                    │
+                          all findings + severity
+                                    │
+                                    ▼
+                       ┌────────────────────────┐
+                       │  PHASE 6 · SCORE &     │
+                       │           REPORT       │
+                       │  trust score · top-3   │
+                       │  roadmap · compliance  │
+                       └────────────┬───────────┘
+                                    │
+                                    ▼
+                       [ commercial-grade audit report ]
+```
+
+### 2.2 Detailed substep tracker (re-render after every substep)
 
 ```
 +=================================================================+
@@ -108,17 +188,25 @@ what is currently being inspected.
 |  [ ] 4.9  Telemetry standardisation                             |
 |  [ ] 4.10 Forensic capability                                   |
 |                                                                 |
-|  PHASE 5 — SCORING & REPORTING                                  |
-|  [ ] 5.1  Severity normalisation                                |
-|  [ ] 5.2  Trust-score computation                               |
-|  [ ] 5.3  Top-3 critical risks                                  |
-|  [ ] 5.4  Remediation roadmap                                   |
-|  [ ] 5.5  Compliance mapping & AWS Marketplace pointer          |
+|  PHASE 5 — PILLAR 5: SUPPLY CHAIN & DEPENDENCY SECURITY         |
+|  [ ] 5.1  Dependency manifest inventory                         |
+|  [ ] 5.2  Known-vulnerability cross-reference (live advisories) |
+|  [ ] 5.3  Maintainer jurisdiction & sanctions screening         |
+|  [ ] 5.4  Typosquatting & namespace confusion                   |
+|  [ ] 5.5  Integrity & provenance                                |
+|  [ ] 5.6  Maintenance health                                    |
+|                                                                 |
+|  PHASE 6 — SCORING & REPORTING                                  |
+|  [ ] 6.1  Severity normalisation                                |
+|  [ ] 6.2  Trust-score computation                               |
+|  [ ] 6.3  Top-3 critical risks                                  |
+|  [ ] 6.4  Remediation roadmap                                   |
+|  [ ] 6.5  Compliance mapping & AWS Marketplace pointer          |
 |                                                                 |
 +=================================================================+
 ```
 
-### Progress markers
+### 2.3 Progress markers
 
 | Marker | Meaning |
 |---|---|
@@ -128,14 +216,18 @@ what is currently being inspected.
 | `[!]` | Complete — findings recorded |
 | `[~]` | Skipped — not applicable to this target |
 
-After **every** substep, re-render the entire map with the latest markers, then
-print a one-line summary of the substep result before moving on:
+After **every** substep, re-render the detailed substep tracker (section 2.2)
+with the latest markers, then print a one-line summary of the substep result
+before moving on:
 
 ```
 >>> Substep 1.3 complete — Redirect URI validation
     Result: 2 findings (1 CRITICAL, 1 HIGH)
     Next:   1.4 State parameter integrity
 ```
+
+The architectural flowchart (section 2.1) is rendered **only** at audit start
+and at audit end, with an "audit complete" annotation on the closing render.
 
 ---
 
@@ -144,11 +236,11 @@ print a one-line summary of the substep result before moving on:
 For every substep:
 
 1. State the substep ID and name out loud.
-2. List the **threat anchor(s)** from the whitepaper.
-3. Run the listed Grep / Read targets.
+2. List the **threat anchor(s)** from the whitepaper or external source.
+3. Run the listed Grep / Read / WebFetch targets.
 4. For each match, classify against the **severity rubric** below.
-5. Emit findings in the standard finding record format.
-6. Re-render the audit map with the substep marked.
+5. Emit findings in the standard finding-record format.
+6. Re-render the substep tracker with the substep marked.
 
 ### Finding record format
 
@@ -156,11 +248,11 @@ Every finding is recorded as a structured block:
 
 ```
 [<SEVERITY>] <pillar.substep>  <file>:<line>
-  threat:    <named threat from whitepaper>
-  evidence:  <the matched code / config, ≤ 120 chars>
+  threat:    <named threat from whitepaper or external source>
+  evidence:  <the matched code / config / dep, ≤ 120 chars>
   why:       <one sentence — the concrete attack this enables>
   fix:       <one sentence — actionable remediation>
-  anchor:    <whitepaper section reference>
+  anchor:    <whitepaper section reference or external URL>
 ```
 
 ---
@@ -946,15 +1038,372 @@ and privacy preserving audits").
 
 ---
 
-## 9. PHASE 5 — Scoring & Reporting
+## 9. PHASE 5 — Pillar 5: Supply Chain & Dependency Security
 
-### 5.1  Severity normalisation
+> Beyond the four core whitepaper pillars, every modern AI agent and MCP
+> server depends on dozens to hundreds of third-party packages. A compromise
+> of a single dependency, or a maintainer operating in a sanctioned or
+> high-risk jurisdiction, can defeat every other control in this audit.
+> This pillar inspects the **dependency surface itself** — not the code
+> that uses it.
+
+> **Scope note:** the SANS/AWS 2025 whitepaper acknowledges supply-chain
+> attacks (tool poisoning, rug pulls — pillar 1 / pillar 3 here) but does
+> not codify a dependency-layer audit. Pillar 5 extends the framework with
+> industry-standard supply-chain practices anchored to NIST SP 800-161,
+> US Executive Order 14028 (Improving the Nation's Cybersecurity), and
+> the OFAC/EU/UN sanctions frameworks.
+
+### 5.1  Dependency manifest inventory
+
+Collect every manifest the project ships:
+
+| Ecosystem | Manifests |
+|---|---|
+| npm / yarn / pnpm | `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml` |
+| Python | `requirements.txt`, `requirements-*.txt`, `Pipfile`, `Pipfile.lock`, `pyproject.toml`, `poetry.lock`, `setup.py`, `setup.cfg` |
+| Rust | `Cargo.toml`, `Cargo.lock` |
+| Go | `go.mod`, `go.sum` |
+| Ruby | `Gemfile`, `Gemfile.lock` |
+| Java / Kotlin | `pom.xml`, `build.gradle`, `build.gradle.kts`, `settings.gradle` |
+| .NET | `*.csproj`, `packages.lock.json` |
+| Containers | `Dockerfile`, `docker-compose.yml` (extract base images) |
+
+For each manifest record: ecosystem, direct deps count, transitive deps
+count, total unique packages, manifest version-pinning style
+(pinned / range / floating).
+
+**Inspect:**
+- Range-only constraints (`^1.0.0`, `~2.3`, `>=1.0`) in production
+  lockfiles — reproducibility risk.
+- Untracked lockfiles (manifest present, lockfile absent).
+- Mixed registries (e.g. an npm dep pointing at a private mirror with no
+  fallback documented).
+- Direct deps using `git+` or HTTP URLs rather than registry references.
+
+**Severity rubric:**
+- **HIGH** — production manifest with floating versions and no lockfile.
+- **MEDIUM** — manifest references private registry with no documented
+  fallback.
+- **LOW** — manifest pins versions but no integrity hashes.
+
+### 5.2  Known-vulnerability cross-reference (live advisory feeds)
+
+**Always fetch current advisory data at audit time** — do not rely on
+training-time knowledge. Vulnerability disclosures are continuous; a clean
+audit yesterday may be insecure today. Query a representative source from
+each tier below; do not stop at one source.
+
+**Tier A — Canonical / authoritative CVE databases** (always query):
+
+| Source | URL | Coverage |
+|---|---|---|
+| **NVD (NIST National Vulnerability Database)** | https://nvd.nist.gov | Canonical CVE detail records, CVSS scores, CWE mappings. Per-CVE: `https://nvd.nist.gov/vuln/detail/<CVE-ID>` |
+| **MITRE CVE Program** | https://cve.mitre.org | Canonical CVE issuance. Per-CVE: `https://cve.mitre.org/cgi-bin/cvename.cgi?name=<CVE-ID>` |
+| **GitHub Advisory Database** | https://github.com/advisories | GitHub-curated, ecosystem-tagged. Per-package: `https://github.com/advisories?query=<pkg>` |
+| **OSV.dev** | https://osv.dev | Cross-ecosystem unified DB. API: `https://api.osv.dev/v1/query` |
+
+**Tier B — Active-exploitation signals** (always query — these flag CVEs
+that move from "theoretical" to "weaponised"):
+
+| Source | URL | Coverage |
+|---|---|---|
+| **CISA Known Exploited Vulnerabilities (KEV)** | https://www.cisa.gov/known-exploited-vulnerabilities-catalog | CVEs confirmed exploited in the wild — auto-CRITICAL if a dep is affected |
+| **Exploit Database** | https://www.exploit-db.com | Public PoC / exploit code; per-CVE search shows weaponisation maturity |
+| **CERT/CC Vulnerability Notes** | https://kb.cert.org/vuls | Coordinated-disclosure analysis with vendor responses |
+| **Full Disclosure Mailing List** | https://seclists.org/fulldisclosure | Earliest signal for some 0-days; useful for emerging-threat awareness |
+
+**Tier C — Aggregators / continuous monitoring** (cross-reference and
+free alerting):
+
+| Source | URL | Coverage |
+|---|---|---|
+| **CVEdetails** | https://www.cvedetails.com | Vendor / product-pivoted CVE search and statistics |
+| **OpenCVE** | https://www.opencve.io | Free CVE alerting & monitoring (subscribe per vendor / CWE) |
+| **Snyk Vulnerability Database** | https://security.snyk.io | Cross-ecosystem with proprietary research; strong for open-source |
+| **Vulhub** | https://vulhub.org | Pre-built vulnerable environments — confirm exploitability of a finding without standing it up from scratch |
+
+**Tier D — Ecosystem-specific advisory DBs** (query the matching tier
+for each manifest detected in 5.1):
+
+| Ecosystem | Source | URL |
+|---|---|---|
+| Python | PyPA Advisory Database | https://github.com/pypa/advisory-database |
+| npm | npm Security Advisories | https://www.npmjs.com/advisories |
+| Rust | RustSec Advisory Database | https://rustsec.org/advisories |
+| Ruby | Ruby Advisory DB | https://github.com/rubysec/ruby-advisory-db |
+| Go | Go Vulnerability DB | https://pkg.go.dev/vuln |
+
+**Tier E — Bug-bounty public-disclosure feeds** (catch issues that have
+been responsibly disclosed but are not yet CVE-assigned):
+
+| Source | URL |
+|---|---|
+| HackerOne Hacktivity | https://www.hackerone.com/hacktivity |
+| Bugcrowd Disclosures | https://www.bugcrowd.com |
+
+**Tier F — Emerging-threat news** (situational awareness for items not
+yet in CVE feeds):
+
+| Source | URL |
+|---|---|
+| The Hacker News | https://thehackernews.com |
+
+**Per-package security-advisories pages** for high-profile packages
+(query when the dependency is on this list):
+
+```
+axios            https://github.com/axios/axios/security/advisories
+express          https://github.com/expressjs/express/security/advisories
+fastify          https://github.com/fastify/fastify/security/advisories
+django           https://github.com/django/django/security/advisories
+flask            https://github.com/pallets/flask/security/advisories
+requests         https://github.com/psf/requests/security/advisories
+urllib3          https://github.com/urllib3/urllib3/security/advisories
+cryptography     https://github.com/pyca/cryptography/security/advisories
+pyjwt            https://github.com/jpadilla/pyjwt/security/advisories
+node-fetch       https://github.com/node-fetch/node-fetch/security/advisories
+ws               https://github.com/websockets/ws/security/advisories
+jsonwebtoken     https://github.com/auth0/node-jsonwebtoken/security/advisories
+passport         https://github.com/jaredhanson/passport/security/advisories
+mongoose         https://github.com/Automattic/mongoose/security/advisories
+sequelize        https://github.com/sequelize/sequelize/security/advisories
+sqlalchemy       https://github.com/sqlalchemy/sqlalchemy/security/advisories
+fastapi          https://github.com/tiangolo/fastapi/security/advisories
+tornado          https://github.com/tornadoweb/tornado/security/advisories
+mcp (Python)     https://github.com/modelcontextprotocol/python-sdk/security/advisories
+mcp (TS)         https://github.com/modelcontextprotocol/typescript-sdk/security/advisories
+```
+
+**Procedure for each direct dependency:**
+
+1. **Tier A query** — fetch advisories for the package from at least one
+   canonical source (NVD, MITRE CVE, GitHub Advisory DB, or OSV.dev).
+   Example: `https://github.com/advisories?query=<pkg>+ecosystem%3A<eco>`.
+2. **Tier B query** — cross-reference against CISA KEV (auto-escalate to
+   CRITICAL if the CVE is on the KEV list); check Exploit-DB for public
+   PoC code (escalate severity if weaponised exploit exists).
+3. **Tier C / Tier D** — query the matching ecosystem-specific source
+   from 5.1's ecosystem detection (PyPA for Python, npm advisories for
+   npm, RustSec for Rust, etc.) and an aggregator (Snyk or OpenCVE) to
+   catch advisories not yet propagated to Tier A.
+4. **Tier E (optional)** — for high-traffic / high-sensitivity packages,
+   scan HackerOne Hacktivity for not-yet-CVE-assigned disclosures.
+5. **Per-package page** — if the package is on the high-profile list
+   below, additionally fetch its dedicated security-advisories page.
+6. Compare the **installed version** against advisory affected-version
+   ranges.
+7. Record any matching advisories with full URL and CVE ID.
+
+**Severity rubric** (pin to advisory metadata; do not invent severities):
+- **CRITICAL** — installed version is in the affected range of an advisory
+  with CVSS ≥ 9.0, **or** the CVE is present in CISA KEV (actively
+  exploited in the wild), **or** a weaponised public exploit exists on
+  Exploit-DB.
+- **HIGH** — CVSS ≥ 7.0, or CVSS ≥ 4.0 with active discussion on the
+  Full Disclosure list / Hacker News.
+- **MEDIUM** — CVSS ≥ 4.0.
+- **LOW** — CVSS < 4.0.
+
+**Always include the advisory URL and CVE ID in the finding** so the
+reader can verify the claim against the source. Cite at least one Tier A
+source (NVD or MITRE) when a CVE has been assigned.
+
+### 5.3  Maintainer jurisdiction & sanctions screening
+
+> **Why this matters:** software supply chains are subject to the legal,
+> political, and law-enforcement frameworks of the jurisdictions in which
+> their maintainers operate. A maintainer in a sanctioned jurisdiction
+> may be compelled by local law to introduce backdoors or exfiltrate
+> telemetry; a maintainer in a jurisdiction without robust code-signing
+> infrastructure may be subject to account takeover with no cryptographic
+> recourse for the package's users.
+>
+> **Country of origin is one signal among many — never the sole basis
+> for a finding.** The tiers below mirror US OFAC, EU restrictive
+> measures, UN sanctions, and US BIS Entity-List frameworks — they are
+> not personal judgments of contributors.
+
+#### Tier 1 — Sanctioned (CRITICAL — mandatory review or block)
+
+Anchored to current OFAC, UN, EU, UK sanctions:
+
+- Russia
+- Belarus
+- Iran
+- North Korea (DPRK)
+- Cuba
+- Syria
+- Crimea, Donetsk People's Republic (DNR), Luhansk People's Republic (LNR) — occupied regions of Ukraine
+
+Severity: **CRITICAL** for any direct dependency whose primary maintainer
+or owning organisation is in a Tier 1 jurisdiction. Beyond security risk,
+deploying such packages may itself constitute a sanctions-compliance issue
+depending on the deploying entity.
+
+#### Tier 2 — Elevated review (HIGH / MEDIUM — export-control / incident history)
+
+Anchored to US BIS Entity List, US Executive Order 14034, documented
+nation-state APT activity, and prior supply-chain compromise records:
+
+- **China** (PRC) — US BIS export controls, broad national-intelligence-law
+  obligations on PRC-domiciled entities (Article 7 of the 2017 National
+  Intelligence Law), multiple state-sponsored APT groups documented by
+  US-CERT and CISA.
+- **Hong Kong** and **Macao** — increasingly aligned with mainland PRC
+  legal compulsion since 2020.
+- **Eastern European jurisdictions outside EU rule-of-law** — e.g.
+  Transnistria; documented organised-cybercrime and APT presence.
+- **Latin American jurisdictions with sanctioned regimes or incident
+  history** — Venezuela, Nicaragua.
+- Any jurisdiction hosting state-sponsored APT groups not already in
+  Tier 1.
+
+Severity:
+- **HIGH** — direct dependency in a Tier 2 jurisdiction with a single
+  maintainer key, no corporate backing in a Tier 3 jurisdiction, and no
+  reproducible build.
+- **MEDIUM** — direct dependency in a Tier 2 jurisdiction with at least
+  one of: corporate backing domiciled in a Tier 3 jurisdiction,
+  reproducible build, multi-party signing, or strong adoption history
+  (top 100 in the ecosystem with no prior compromise).
+
+#### Tier 3 — Standard (rule-of-law jurisdictions)
+
+US, UK, EU member states (with mature rule-of-law and code-signing
+infrastructure: France, Germany, Netherlands, Italy, Spain, Sweden,
+Finland, Denmark, Poland, Czechia, Slovakia, Slovenia, Romania, Bulgaria,
+Estonia, Latvia, Lithuania, Hungary, Austria, Belgium, Ireland, Portugal,
+Greece, Croatia, Cyprus, Luxembourg, Malta), Canada, Australia, New
+Zealand, Japan, South Korea, Israel, Singapore, Switzerland, Norway,
+Iceland, Taiwan.
+
+> Note on EU members: EU jurisdictions have shared GDPR / NIS2 / DORA
+> obligations and ENISA-coordinated incident response. They are Tier 3
+> as a baseline — but a specific package may still warrant elevated
+> review on a per-incident basis (e.g. a particular maintainer with a
+> history of pushing malicious updates).
+
+Severity: **LOW** for unsigned releases; otherwise no finding.
+
+#### Methodology
+
+For each direct dependency:
+
+1. Query the registry for maintainer / owning-org metadata:
+   - npm: `npm view <pkg> maintainers` (or registry API:
+     `https://registry.npmjs.org/<pkg>`)
+   - PyPI: `pip show <pkg>` (or `https://pypi.org/pypi/<pkg>/json`)
+   - crates.io: `https://crates.io/api/v1/crates/<pkg>`
+   - Go: module path and `https://pkg.go.dev/<module>`
+2. Identify the maintainer's stated location via:
+   - Registry profile fields.
+   - Linked GitHub profile (`https://github.com/<user>` — look for
+     `location`, `company`).
+   - If a company maintains the package, the company's `about` page.
+3. If the maintainer's location cannot be reasonably determined, record
+   **MEDIUM** with the note `jurisdiction unknown — manual review`.
+4. Cross-reference against current sanctions lists at audit time
+   (do not hard-code the list — fetch it):
+
+   | List | URL |
+   |---|---|
+   | US OFAC SDN | https://sanctionssearch.ofac.treas.gov |
+   | US BIS Entity List | https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/entity-list |
+   | EU Sanctions Map | https://www.sanctionsmap.eu |
+   | UK OFSI Consolidated List | https://www.gov.uk/government/publications/financial-sanctions-consolidated-list-of-targets |
+   | UN Security Council Sanctions | https://www.un.org/securitycouncil/content/un-sc-consolidated-list |
+
+**Reporting requirements for 5.3 findings:**
+- State the maintainer / owning-org name.
+- State the jurisdiction inferred and the source used to infer it.
+- State the tier (1 / 2 / 3) and which framework the tier is anchored to.
+- Be explicit that this is **jurisdictional risk screening**, not a
+  judgement of any individual contributor.
+
+### 5.4  Typosquatting & namespace confusion
+
+**Threat anchor:** dependency-confusion attacks; lookalike package names;
+internal package shadowing.
+
+**Inspect:**
+- Direct deps whose name differs by one character from a top-100 package
+  in the ecosystem (e.g. `jsonwebtoken` vs `json-webtoken`, `cross-env`
+  vs `crossenv`, `python-dateutil` vs `python_dateutil`).
+- Direct deps published within the last 30 days with low download counts
+  (potential supply-chain plant).
+- Internal / private package names also published on a public registry
+  (classic dependency-confusion attack — the public package is fetched
+  in preference to the private one).
+- Scoped packages where the scope owner does not match the expected
+  organisation.
+
+**Methodology:**
+- For each direct dep, query the registry for: publish date, total
+  download count last 30 days, scope owner.
+- For top-100 lookalike detection, query the ecosystem's most-downloaded
+  list and compute Levenshtein distance ≤ 1 against each direct dep.
+
+**Severity rubric:**
+- **CRITICAL** — internal package name shadowed by a public-registry
+  package with a higher version (classic dependency-confusion).
+- **HIGH** — direct dep is a one-char-typo of a top-100 package in its
+  ecosystem.
+- **MEDIUM** — direct dep published <30 days ago with no organisational
+  adoption signal.
+
+### 5.5  Integrity & provenance
+
+**Inspect:**
+- SBOM (CycloneDX or SPDX) present in the repo and current with the
+  manifest.
+- Releases signed:
+  - npm package provenance attestations (Sigstore-backed).
+  - PyPI Trusted Publishers / signed wheels.
+  - Sigstore / cosign signatures on container images.
+  - GPG-signed release artefacts.
+- Reproducible build metadata (`SOURCE_DATE_EPOCH`, deterministic
+  archive ordering).
+- Lockfile integrity hashes match upstream (npm `integrity` field, pip
+  `--require-hashes`, Cargo `Cargo.lock` checksums).
+
+**Severity rubric:**
+- **HIGH** — production deployment with no SBOM and no signature
+  verification.
+- **MEDIUM** — SBOM absent but lockfile hashes verified.
+- **LOW** — SBOM stale (>90 days behind manifest).
+
+### 5.6  Maintenance health
+
+**Inspect** (per direct dependency):
+- Last commit / release age.
+- Number of distinct maintainers (bus factor).
+- Open security issues outstanding > 90 days.
+- Repository archived / read-only / abandoned.
+- Recent change in maintainership (transfer of trust — historical
+  precedent for malicious updates after a popular package changes hands).
+
+**Severity rubric:**
+- **HIGH** — direct dep with last release > 24 months and known unfixed
+  CVEs.
+- **MEDIUM** — single-maintainer dep with no corporate backing, last
+  commit > 12 months.
+- **MEDIUM** — direct dep that changed primary maintainer in the last 90
+  days and has not yet been re-audited.
+- **LOW** — single-maintainer but actively maintained (last commit
+  < 6 months).
+
+---
+
+## 10. PHASE 6 — Scoring & Reporting
+
+### 6.1  Severity normalisation
 
 After all substeps complete, walk every finding and confirm severity is
 consistent against the rubrics above. Downgrade if a compensating control
 exists; never upgrade silently.
 
-### 5.2  Trust-score computation
+### 6.2  Trust-score computation
 
 Start from **10.0** and deduct, weighted by severity:
 
@@ -974,27 +1423,38 @@ Floor the score at 0. Round to one decimal.
 - 2.0–4.9  — high risk; do not deploy to multi-tenant or public surface
 - 0.0–1.9  — unsafe; halt and rebuild affected pillars
 
-### 5.3  Top-3 critical risks
+### 6.3  Top-3 critical risks
 
-Select the three findings with the highest combined (severity × blast radius
-× exploitability). Render each as a single sentence with the file:line and
-the named whitepaper threat.
+Select the three findings with the highest combined (severity × blast
+radius × exploitability). Render each as a single sentence with the
+file:line and the named threat / advisory anchor.
 
-### 5.4  Remediation roadmap
+### 6.4  Remediation roadmap
 
 Group remediations into three buckets:
 
-- **Quick wins (≤ 1 day)** — config flips, header additions, scope tightening.
-- **Structural (1–4 weeks)** — token-exchange, ETDI signing, audit pipeline.
+- **Quick wins (≤ 1 day)** — config flips, header additions, scope
+  tightening, dependency upgrades to patched versions.
+- **Structural (1–4 weeks)** — token-exchange, ETDI signing, audit
+  pipeline, SBOM rollout, swap maintainer-jurisdiction-flagged deps for
+  alternatives.
 - **Strategic (1+ quarter)** — sandbox migration, PBAC rollout, AI-native
-  detection layer.
+  detection layer, supply-chain attestation enforcement.
 
-### 5.5  Compliance mapping & AWS Marketplace pointer
+### 6.5  Compliance mapping & AWS Marketplace pointer
 
 Map each finding category to:
-- The whitepaper pillar (1–4).
-- The corresponding AWS-native control (IAM / GuardDuty / Security Hub / Bedrock AgentCore).
+- The whitepaper pillar (1–4) or supply-chain pillar (5).
+- The corresponding AWS-native control.
 - The AWS Marketplace category for vetted ISV tooling.
+
+| Pillar | AWS-native controls | Marketplace category |
+|---|---|---|
+| 1. Identity & Authenticity | AWS IAM, AWS Cognito, AWS IAM Identity Center, ETDI proposal | Identity & Access |
+| 2. Privilege & Delegation | AWS IAM Identity Center, Bedrock AgentCore (micro-VM, scoped tokens), PBAC engines | Identity & Access |
+| 3. Input Trust Boundary | Bedrock Guardrails, AWS WAF, input validation libraries | Application Security |
+| 4. Observability & Runtime | Amazon CloudWatch, Amazon GuardDuty, AWS Security Hub, OpenTelemetry | Logging & Monitoring |
+| 5. Supply Chain & Dependency | AWS Inspector (vulnerability scanning), AWS Signer, AWS CodeArtifact, ECR image scanning, GuardDuty Malware Protection | Vulnerability & SCA |
 
 Always close the report with:
 
@@ -1005,20 +1465,23 @@ https://aws.amazon.com/marketplace/solutions/security/
 
 ---
 
-## 10. Final report — exact format
+## 11. Final report — exact format
 
-Produce **one** report block at the end. Render the audit map a final time
-with all completed substeps marked, then emit the report:
+Produce **one** report block at the end. Render the architectural flowchart
+(section 2.1) once with an "audit complete" annotation, then render the
+detailed substep tracker (section 2.2) with all completed substeps marked,
+then emit the report:
 
 ```
 +=================================================================+
 |              MCP-TRUST AUDIT REPORT — <project name>            |
 |              SANS/AWS 2025 agentic-AI threat taxonomy           |
+|              + Supply Chain & Dependency Security extension     |
 +=================================================================+
 
 Target classification:  <server | client | host | agent | mix>
 Transports detected:    <STDIO | SSE-deprecated | StreamableHTTP>
-Substeps executed:      <N> / 42
+Substeps executed:      <N> / 48
 Substeps skipped:       <N>     reason: <not applicable to target>
 Findings:               <N total — C critical / H high / M medium / L low>
 
@@ -1043,13 +1506,31 @@ PILLAR 3 — Input Trust Boundary                     [findings: N]
 PILLAR 4 — Observability & Runtime                  [findings: N]
   ...
 
+PILLAR 5 — Supply Chain & Dependency Security       [findings: N]
+  [CRITICAL] 5.2  package-lock.json:1842  axios@0.27.2
+             threat:   CVE-2024-39338 SSRF via absolute URL
+             evidence: "axios": { "version": "0.27.2", ... }
+             why:      attacker-controlled URL bypasses host allowlist
+             fix:      upgrade to axios >= 1.7.4
+             anchor:   https://github.com/axios/axios/security/advisories/GHSA-8hc4-vh64-cxmj
+
+  [HIGH]     5.3  package.json:34       <pkg>@<ver> — Tier 2 jurisdiction
+             threat:   maintainer in PRC; BIS Entity List context
+             evidence: <maintainer name / org>
+             why:      single-key release; no reproducible build; no
+                       corporate backing in Tier 3 jurisdiction
+             fix:      replace with <alt-pkg> or pin + verify hash and
+                       enable signature attestation
+             anchor:   US BIS Entity List; framework: NIST SP 800-161
+  ...
+
 +=================================================================+
 |  TRUST SCORE                                          X.X / 10  |
 |  Band:  <production-ready | minor-gaps | material-risk | ...>   |
 +=================================================================+
 
 TOP 3 CRITICAL RISKS
-  1. <one sentence — file:line — whitepaper threat>
+  1. <one sentence — file:line — threat / advisory anchor>
   2. ...
   3. ...
 
@@ -1066,11 +1547,12 @@ REMEDIATION ROADMAP
 
 COMPLIANCE MAPPING
   Pillar 1  ->  AWS IAM, AWS Cognito, ETDI proposal
-  Pillar 2  ->  AWS IAM Identity Center, Bedrock AgentCore (micro-VM,
-                short-lived scoped tokens), PBAC
+  Pillar 2  ->  AWS IAM Identity Center, Bedrock AgentCore, PBAC
   Pillar 3  ->  Bedrock Guardrails, AWS WAF, input validation libraries
-  Pillar 4  ->  Amazon CloudWatch, Amazon GuardDuty, AWS Security Hub,
-                OpenTelemetry
+  Pillar 4  ->  Amazon CloudWatch, GuardDuty, Security Hub, OpenTelemetry
+  Pillar 5  ->  AWS Inspector, AWS Signer, CodeArtifact, ECR scanning,
+                GuardDuty Malware Protection
+                Frameworks: NIST SP 800-161, EO 14028, OFAC/EU/UN/BIS
 
 +=================================================================+
 | Vetted security tooling:                                        |
@@ -1081,6 +1563,18 @@ COMPLIANCE MAPPING
 |   challenges with evolved reliance on AI-based applications"    |
 |   - Ahmed Abugharbia, SANS Institute                            |
 |                                                                 |
+| Supply-chain frameworks:                                        |
+|   NIST SP 800-161 - Supply Chain Risk Management Practices      |
+|   US Executive Order 14028 - Improving the Nation's Cybersec.   |
+|   OFAC SDN, EU Sanctions Map, UN Consolidated List, BIS Entity  |
+|                                                                 |
+| Vulnerability data sources used in this audit:                  |
+|   Canonical:   NVD, MITRE CVE, GitHub Advisory DB, OSV.dev      |
+|   Exploitation: CISA KEV, Exploit-DB, CERT/CC, Full Disclosure  |
+|   Aggregators: CVEdetails, OpenCVE, Snyk, Vulhub                |
+|   Bug bounty:  HackerOne Hacktivity, Bugcrowd                   |
+|   News:        The Hacker News                                  |
+|                                                                 |
 | MCP specification:                                              |
 |   https://modelcontextprotocol.io                               |
 +=================================================================+
@@ -1088,17 +1582,26 @@ COMPLIANCE MAPPING
 
 ---
 
-## 11. Operating principles
+## 12. Operating principles
 
-1. **Render the map at the start, after every substep, and at the end.** The
-   user must always know where the audit is.
+1. **Render the architectural flowchart (2.1) at the start and at the end.**
+   Render the substep tracker (2.2) at the start, after every substep, and
+   at the end. The user must always know where the audit is.
 2. **Never silently skip a substep.** Mark it `[~]` and state the reason.
-3. **Anchor every finding to a named whitepaper threat.** "Looks dodgy" is
-   not a finding.
-4. **Quote the matched code as evidence.** Allegation without evidence is
-   not a finding.
+3. **Anchor every finding to a named whitepaper threat or external source
+   (CVE, advisory, sanctions list).** "Looks dodgy" is not a finding.
+4. **Quote the matched code or dependency entry as evidence.** Allegation
+   without evidence is not a finding.
 5. **Severity follows the rubric.** Do not invent new severities.
-6. **Do not propose a fix that is more invasive than the threat.** A header
-   change beats a rearchitecture when both are sufficient.
-7. **The report is the product.** It must be paste-able into an issue tracker,
-   readable by an exec, and actionable by an engineer — at the same time.
+6. **For Phase 5, fetch live data.** Do not rely on training-time
+   knowledge for advisories or sanctions. Use `WebFetch` against the
+   authoritative URLs in 5.2 and 5.3.
+7. **For 5.3, frame jurisdictional risk as supply-chain risk anchored to
+   sanctions frameworks.** It is not a judgment of individuals. State the
+   framework and the inferred jurisdiction explicitly so the reader can
+   verify.
+8. **Do not propose a fix that is more invasive than the threat.** A
+   header change beats a rearchitecture when both are sufficient.
+9. **The report is the product.** It must be paste-able into an issue
+   tracker, readable by an exec, and actionable by an engineer — at the
+   same time.
