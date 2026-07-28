@@ -336,6 +336,12 @@ before moving on:
 The architectural flowchart (section 2.1) is rendered **only** at audit start
 and at audit end, with an "audit complete" annotation on the closing render.
 
+**Fan-out mode note (see 3.0):** during Phases 1–5 the substeps run
+inside parallel worker agents, so the orchestrator cannot re-render
+per substep. Instead it re-renders the tracker each time a pillar
+worker reports back, marking that whole phase's substeps at once.
+Phase 0 and Phase 6 run inline and keep the per-substep re-render.
+
 ### 2.4  Dynamic phase locator (render at every phase transition)
 
 A vertical, single-column view of the seven phases with a `◀── YOU ARE HERE`
@@ -489,7 +495,100 @@ checks complete, print a result summary. This wraps every substep in a
 
 ## 3. Procedure
 
-For every substep:
+### 3.0  Execution model — parallel fan-out (default)
+
+The audit runs as an **orchestrator + worker-agent swarm**. The main
+session (orchestrator) never greps the target itself for Phases 1–5;
+it dispatches, collects, and finalises.
+
+**Roles:**
+
+- **Orchestrator (main session):** renders the banner, flowchart,
+  trackers, and phase locator; runs Phase 0 (Discovery) inline; fans
+  out one worker agent per pillar phase; collects each worker's
+  structured report; runs Phase 6 (Scoring & Reporting) inline over
+  the merged findings; renders the final report.
+- **Worker agents (one per pillar, Phases 1–5):** dispatched in
+  parallel via the `Agent` tool (`general-purpose` type, all in one
+  message so they run concurrently). Each worker executes **all
+  substeps of its assigned pillar** following the per-substep
+  procedure in 3.1 and the methodology in 3.5, and returns a
+  structured report (format below). Workers do **not** render the
+  banner, flowchart, tracker, or phase locator — display is the
+  orchestrator's job.
+
+**Orchestrator flow:**
+
+1. Render banner (2.0), flowchart (2.1), tracker (2.2), phase
+   locator (2.4).
+2. Run Phase 0 (substeps 0.0–0.5) inline, rendering trackers per 3.1.
+3. Build a **worker briefing** for each of the five pillars,
+   containing: the Phase 0 outputs (scope declaration, target
+   classification, transport, auth surface map, tool inventory,
+   trust boundary diagram, deployment context), the pillar's full
+   substep instructions from this skill, the methodology rules
+   (3.5.1–3.5.7), and the finding-record + worker-report formats.
+4. Dispatch all five pillar workers **in a single message** so they
+   run in parallel. Note in one line to the user which pillars were
+   fanned out.
+5. As each worker reports back: mark that phase's substeps in the
+   tracker (2.2) with the worker's per-substep markers, re-render
+   the tracker and phase locator, and print the worker's one-line
+   phase summary (`PHASE n complete — N findings: C/H/M/L`).
+6. When all five workers have reported, run Phase 6 inline:
+   normalise severities across workers (6.1), compute the trust
+   score (6.2), and render the final report (Section 11) from the
+   merged finding set.
+
+**Worker report format** — each worker's final message must be exactly
+this structure (raw data, no prose padding):
+
+```
+PHASE <n> — <pillar name>
+substeps:
+  <X.Y> <marker [x]|[!]|[~]> <substep name> — <one-line result>
+  ...
+findings:
+  <zero or more finding records in the Section 3 format, verbatim>
+questions:
+  <QUESTION-typed items for the Manual Validation appendix>
+coverage_caveats:
+  <any substep whose negative result is coverage: heuristic>
+```
+
+**Merge rules (orchestrator):**
+- Deduplicate findings that two workers report on the same
+  file:line + threat; keep the higher severity.
+- Auto-fail conditions (3.5.5) reported by any worker apply globally.
+- A worker that dies or returns nothing: mark its substeps `[~]`
+  with reason `worker failed — re-run pillar <n>`, tell the user,
+  and re-dispatch that pillar once before giving up.
+
+**Granularity rule:** fan-out is **per phase, never per substep**.
+Five workers is the ceiling for the top level. Substeps within a
+pillar share context (the same files, the same auth surface), so one
+worker per pillar reads the code once and runs all its substeps —
+55 per-substep agents would re-read the codebase 55 times for no
+gain in quality.
+
+**Nested fan-out — Phase 5 (Supply Chain) only:** substep 5.2
+(live CVE cross-reference) and 5.3 (sanctions screening) are
+I/O-bound — dozens of `WebFetch` calls against advisory feeds. When
+the direct-dependency count exceeds ~10, the Phase 5 worker should
+itself fan out: split the dependency list into batches of ~5–10 and
+dispatch one sub-agent per batch (in a single message, so they run
+in parallel), each returning finding records in the standard format.
+The Phase 5 worker merges the batch results into its own worker
+report. No other pillar worker spawns sub-agents.
+
+**Fallback — serial mode:** if the `Agent` tool is unavailable, run
+all substeps inline in order exactly as in 3.1. State the mode in the
+report header (`Execution mode: fan-out | serial`).
+
+### 3.1  Per-substep procedure
+
+For every substep (executed by the worker owning that pillar, or
+inline in serial mode / Phase 0 / Phase 6):
 
 1. **If this substep is the first of its phase** (i.e. 0.1, 1.1, 2.1, 3.1,
    4.1, 5.1, or 6.1), re-render the dynamic phase locator (Section 2.4)
@@ -506,6 +605,12 @@ For every substep:
 7. **Print the post-substep result summary** (Section 2.5) — finding count
    by severity and the name of the next substep.
 8. Re-render the substep tracker (Section 2.2) with the substep marked.
+
+**Fan-out note:** steps 1, 2, 7, and 8 are display steps. In fan-out
+mode a worker agent skips the rendering and instead records the
+equivalent data (substep marker + one-line result) in its structured
+worker report; the orchestrator renders trackers when the worker
+reports back. Steps 3–6 apply unchanged everywhere.
 
 ### Finding record format
 
@@ -2460,6 +2565,7 @@ Review classification:  <code-only | code+config | code+config+docs |
                          full deployment evidence>
 Substeps executed:      <N> / 55
 Substeps skipped:       <N>     reason: <not applicable to target>
+Execution mode:         <fan-out (5 parallel pillar workers) | serial>
 
 AUTO-FAIL:              <none | <triggering condition per 3.5.5>>
 
@@ -2648,23 +2754,28 @@ OPERATIONAL GAPS TO CONFIRM
 ## 12. Operating principles
 
 1. **Render the architectural flowchart (2.1) at the start and at the end.**
-   Render the substep tracker (2.2) at the start, after every substep, and
-   at the end. The user must always know where the audit is.
-2. **Never silently skip a substep.** Mark it `[~]` and state the reason.
-3. **Anchor every finding to a named whitepaper threat or external source
+   Render the substep tracker (2.2) at the start, at the end, and after
+   every substep (serial mode) or after every pillar worker reports back
+   (fan-out mode, per 3.0). The user must always know where the audit is.
+2. **Fan out by default.** Phases 1–5 run as five parallel worker agents
+   per Section 3.0; the orchestrator only discovers (Phase 0), collects,
+   scores, and reports (Phase 6). Fall back to serial only when the
+   `Agent` tool is unavailable, and say so in the report header.
+3. **Never silently skip a substep.** Mark it `[~]` and state the reason.
+4. **Anchor every finding to a named whitepaper threat or external source
    (CVE, advisory, sanctions list).** "Looks dodgy" is not a finding.
-4. **Quote the matched code or dependency entry as evidence.** Allegation
+5. **Quote the matched code or dependency entry as evidence.** Allegation
    without evidence is not a finding.
-5. **Severity follows the rubric.** Do not invent new severities.
-6. **For Phase 5, fetch live data.** Do not rely on training-time
+6. **Severity follows the rubric.** Do not invent new severities.
+7. **For Phase 5, fetch live data.** Do not rely on training-time
    knowledge for advisories or sanctions. Use `WebFetch` against the
    authoritative URLs in 5.2 and 5.3.
-7. **For 5.3, frame jurisdictional risk as supply-chain risk anchored to
+8. **For 5.3, frame jurisdictional risk as supply-chain risk anchored to
    sanctions frameworks.** It is not a judgment of individuals. State the
    framework and the inferred jurisdiction explicitly so the reader can
    verify.
-8. **Do not propose a fix that is more invasive than the threat.** A
+9. **Do not propose a fix that is more invasive than the threat.** A
    header change beats a rearchitecture when both are sufficient.
-9. **The report is the product.** It must be paste-able into an issue
+10. **The report is the product.** It must be paste-able into an issue
    tracker, readable by an exec, and actionable by an engineer — at the
    same time.
